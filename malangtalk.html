@@ -25,14 +25,15 @@
             background-color: rgba(0, 0, 0, 0.15);
             border-radius: 10px;
         }
-        /* Shake animation for profile */
-        @keyframes pulse-ring {
-            0% { transform: scale(0.95); opacity: 0.5; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-            100% { transform: scale(0.95); opacity: 0.5; }
+        /* Notification Toast slide down */
+        @keyframes slide-down {
+            0% { transform: translateY(-110%); opacity: 0; }
+            15% { transform: translateY(0); opacity: 1; }
+            85% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-110%); opacity: 0; }
         }
-        .pulse-active {
-            animation: pulse-ring 2s infinite ease-in-out;
+        .toast-notify {
+            animation: slide-down 4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
     </style>
 </head>
@@ -41,6 +42,21 @@
     <!-- App Container -->
     <div class="w-full max-w-md h-[100vh] md:h-[850px] bg-white rounded-none md:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200/80 relative transition-all">
         
+        <!-- Push Notification Toast Overlay (Top of Screen) -->
+        <div id="notification-toast" onclick="handleNotificationClick()" class="absolute top-4 left-4 right-4 bg-slate-900/95 text-white p-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 transform -translate-y-40 opacity-0 pointer-events-none transition-all duration-300 border border-white/10 backdrop-blur-md cursor-pointer hover:bg-slate-850">
+            <img id="toast-avatar" src="" class="w-10 h-10 rounded-full object-cover border border-white/10">
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-baseline">
+                    <span id="toast-sender-name" class="font-bold text-xs text-yellow-400">보낸 사람</span>
+                    <span class="text-[9px] text-slate-400">지금</span>
+                </div>
+                <p id="toast-message-body" class="text-xs text-slate-200 truncate mt-0.5 font-medium">메시지 본문 내용</p>
+            </div>
+            <div class="p-1 bg-white/10 rounded-full">
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
+            </div>
+        </div>
+
         <!-- Header / Status Bar -->
         <header id="chat-header" class="bg-[#BACEE0] text-slate-800 px-4 pt-3 pb-3 flex flex-col border-b border-black/5 shrink-0 transition-colors duration-300">
             <!-- Simulated Phone Status Bar -->
@@ -61,12 +77,13 @@
                     </button>
                     <!-- Partner Avatar -->
                     <div class="relative">
-                        <img id="header-avatar" src="https://placehold.co/100x100/fbbf24/ffffff?text=김민우" alt="profile" class="w-10 h-10 rounded-full object-cover border border-white/20">
+                        <img id="header-avatar" src="https://placehold.co/100x100/fbbf24/ffffff?text=민우" alt="profile" class="w-10 h-10 rounded-full object-cover border border-white/20">
                         <span id="status-dot" class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#BACEE0] rounded-full"></span>
                     </div>
                     <div>
-                        <h1 id="header-partner-name" class="font-bold text-base text-slate-900 flex items-center gap-1.5">
+                        <h1 id="header-partner-name" class="font-bold text-base text-slate-900 flex items-center gap-1.5 cursor-pointer hover:underline" onclick="openSettingsModal()">
                             김민우
+                            <i data-lucide="pencil" class="w-3 h-3 text-slate-600"></i>
                         </h1>
                         <p id="header-partner-status" class="text-xs text-slate-600 font-medium">온라인</p>
                     </div>
@@ -77,7 +94,7 @@
                     <button onclick="toggleAudio()" id="btn-audio" class="p-2 hover:bg-black/10 rounded-full text-slate-700 transition" title="알림음 토글">
                         <i id="icon-audio" data-lucide="volume-2" class="w-5 h-5"></i>
                     </button>
-                    <button onclick="openSettingsModal()" class="p-2 hover:bg-black/10 rounded-full text-slate-700 transition">
+                    <button onclick="openSettingsModal()" class="p-2 hover:bg-black/10 rounded-full text-slate-700 transition" title="프로필 및 테마 설정">
                         <i data-lucide="settings" class="w-5 h-5"></i>
                     </button>
                 </div>
@@ -97,54 +114,54 @@
             </div>
             
             <!-- Character List -->
-            <div class="flex-1 overflow-y-auto p-3 space-y-2">
+            <div class="flex-1 overflow-y-auto p-3 space-y-2" id="sidebar-char-list">
                 <p class="text-xs text-slate-400 px-2 pb-1 font-semibold uppercase tracking-wider">채팅방 목록</p>
                 
                 <!-- Character 1 -->
                 <button onclick="selectCharacter('minwoo')" id="char-minwoo" class="char-btn w-full p-3 rounded-xl flex items-center gap-3 transition text-left hover:bg-slate-100 dark:hover:bg-slate-700 bg-yellow-50/75 border-l-4 border-yellow-500">
-                    <img src="https://placehold.co/100x100/fbbf24/ffffff?text=민우" class="w-11 h-11 rounded-full object-cover">
+                    <img id="sidebar-avatar-minwoo" src="https://placehold.co/100x100/fbbf24/ffffff?text=민우" class="w-11 h-11 rounded-full object-cover">
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-baseline">
-                            <span class="font-bold text-sm text-slate-900 dark:text-white">김민우</span>
+                            <span id="sidebar-name-minwoo" class="font-bold text-sm text-slate-900 dark:text-white">김민우</span>
                             <span class="text-[10px] text-slate-400">오후 8:42</span>
                         </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">나 지금 과제하는 중인데</p>
+                        <p id="sidebar-desc-minwoo" class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">나 지금 과제하는 중인데</p>
                     </div>
                 </button>
 
                 <!-- Character 2 -->
                 <button onclick="selectCharacter('saea')" id="char-saea" class="char-btn w-full p-3 rounded-xl flex items-center gap-3 transition text-left hover:bg-slate-100 dark:hover:bg-slate-700">
-                    <img src="https://placehold.co/100x100/ec4899/ffffff?text=세아" class="w-11 h-11 rounded-full object-cover">
+                    <img id="sidebar-avatar-saea" src="https://placehold.co/100x100/ec4899/ffffff?text=세아" class="w-11 h-11 rounded-full object-cover">
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-baseline">
-                            <span class="font-bold text-sm text-slate-900 dark:text-white">한세아</span>
+                            <span id="sidebar-name-saea" class="font-bold text-sm text-slate-900 dark:text-white">한세아</span>
                             <span class="text-[10px] text-slate-400">오후 7:16</span>
                         </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">조금 섭섭하게 느껴져서 그래..</p>
+                        <p id="sidebar-desc-saea" class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">조금 섭섭하게 느껴져서 그래..</p>
                     </div>
                 </button>
 
                 <!-- Character 3 -->
                 <button onclick="selectCharacter('boss')" id="char-boss" class="char-btn w-full p-3 rounded-xl flex items-center gap-3 transition text-left hover:bg-slate-100 dark:hover:bg-slate-700">
-                    <img src="https://placehold.co/100x100/6b7280/ffffff?text=부장" class="w-11 h-11 rounded-full object-cover">
+                    <img id="sidebar-avatar-boss" src="https://placehold.co/100x100/6b7280/ffffff?text=부장" class="w-11 h-11 rounded-full object-cover">
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-baseline">
-                            <span class="font-bold text-sm text-slate-900 dark:text-white">박민석 부장</span>
+                            <span id="sidebar-name-boss" class="font-bold text-sm text-slate-900 dark:text-white">박민석 부장</span>
                             <span class="text-[10px] text-slate-400">오후 5:32</span>
                         </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">약간 아쉬운 점이 보이지만 수고했네. 허허.</p>
+                        <p id="sidebar-desc-boss" class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">약간 아쉬운 점이 보이지만 수고했네. 허허.</p>
                     </div>
                 </button>
 
                 <!-- Character 4 -->
                 <button onclick="selectCharacter('jieun')" id="char-jieun" class="char-btn w-full p-3 rounded-xl flex items-center gap-3 transition text-left hover:bg-slate-100 dark:hover:bg-slate-700">
-                    <img src="https://placehold.co/100x100/10b981/ffffff?text=지은" class="w-11 h-11 rounded-full object-cover">
+                    <img id="sidebar-avatar-jieun" src="https://placehold.co/100x100/10b981/ffffff?text=지은" class="w-11 h-11 rounded-full object-cover">
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-baseline">
-                            <span class="font-bold text-sm text-slate-900 dark:text-white">이지은 대리</span>
+                            <span id="sidebar-name-jieun" class="font-bold text-sm text-slate-900 dark:text-white">이지은 대리</span>
                             <span class="text-[10px] text-slate-400">오후 4:10</span>
                         </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">오늘 업무 수고 정말 많으셨습니다!</p>
+                        <p id="sidebar-desc-jieun" class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">오늘 업무 수고 정말 많으셨습니다!</p>
                     </div>
                 </button>
             </div>
@@ -162,7 +179,7 @@
             <!-- Date Separator -->
             <div class="flex justify-center my-2">
                 <span id="chat-date" class="bg-black/15 text-white text-[11px] font-medium px-3 py-1 rounded-full tracking-wide">
-                    2026년 6월 9일 화요일
+                    2026년 6월 14일 일요일
                 </span>
             </div>
 
@@ -189,14 +206,17 @@
         <footer class="bg-white px-3 py-2 border-t border-slate-200/80 flex flex-col gap-1.5 shrink-0 dark:bg-slate-800 dark:border-slate-700">
             <!-- Utility Presets Quick Buttons -->
             <div class="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none scroll-smooth">
-                <button onclick="insertQuickMessage('나 지금 밥 먹고 있음!')" class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition">
-                    🍚 밥 먹는 중
+                <button onclick="insertQuickMessage('나한테 재밌는 농담 하나만 해주라! ㅋㅋㅋ')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:hover:bg-yellow-900/50 dark:text-yellow-300 text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition font-semibold flex items-center gap-1">
+                    🎯 농담 던져봐!
                 </button>
                 <button onclick="insertQuickMessage('오늘 하루 어떻게 보냈어?')" class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition">
                     💬 오늘 뭐했어?
                 </button>
                 <button onclick="insertQuickMessage('오늘 힘든 일이 조금 있었어')" class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition">
                     🥺 힘든 일 있었어
+                </button>
+                <button onclick="insertQuickMessage('사랑해')" class="bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300 text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition font-bold">
+                    ❤️ 사랑해
                 </button>
                 <button onclick="sendSimulatedImage()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 dark:text-amber-300 text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition font-semibold flex items-center gap-1">
                     🖼️ 사진 전송
@@ -263,11 +283,11 @@
             <div class="p-4 grid grid-cols-2 gap-4">
                 <button onclick="sendPresetPhoto('식사')" class="flex flex-col items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition">
                     <span class="text-3xl">🍲</span>
-                    <span class="text-xs text-slate-700 dark:text-slate-300">식사 공유</span>
+                    <span class="text-xs text-slate-700 dark:text-slate-300 font-medium">식사 공유</span>
                 </button>
                 <button onclick="sendPresetPhoto('풍경')" class="flex flex-col items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition">
                     <span class="text-3xl">🌳</span>
-                    <span class="text-xs text-slate-700 dark:text-slate-300">풍경 공유</span>
+                    <span class="text-xs text-slate-700 dark:text-slate-300 font-medium">풍경 공유</span>
                 </button>
                 <button onclick="sendGiftMessage()" class="flex flex-col items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition border border-yellow-200">
                     <span class="text-3xl">🎁</span>
@@ -285,20 +305,27 @@
     <div id="settings-modal" class="absolute inset-0 bg-black/40 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transition-all">
             <div class="p-4 bg-slate-100 dark:bg-slate-700 flex justify-between items-center font-bold">
-                <span class="flex items-center gap-1.5"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i>시뮬레이터 설정</span>
+                <span class="flex items-center gap-1.5"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i>프로필 & 시뮬레이터 설정</span>
                 <button onclick="closeSettingsModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <div class="p-5 space-y-4">
+            <div class="p-5 space-y-4 max-h-[500px] overflow-y-auto chat-scroll">
                 <!-- User Name Customization -->
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">내 이름 설정</label>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">내 이름 설정 (카톡 수신자)</label>
                     <input type="text" id="input-my-name" value="이몽룡" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
                 </div>
 
                 <!-- Custom Partner Name -->
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">상대방 애칭 변경</label>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">상대방 이름 변경 (보내는 사람)</label>
                     <input type="text" id="input-partner-name" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                    <p class="text-[10px] text-slate-400 mt-1">이름을 '엄마', '아빠'로 바꾸면 특별히 사랑 가득한 부모님 대화 모드로 자동 변경됩니다.</p>
+                </div>
+
+                <!-- Custom Partner Status message -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">상대방 상태메시지 설정</label>
+                    <input type="text" id="input-partner-status-msg" placeholder="기본 온라인" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
                 </div>
 
                 <!-- Gemini API Key (Optional) -->
@@ -343,7 +370,6 @@
         // Audio Notification Synthesizer (Web Audio API)
         let audioEnabled = true;
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
         function playKakaoSound() {
             if (!audioEnabled) return;
             try {
@@ -395,98 +421,161 @@
             lucide.createIcons();
         }
 
-        // Global State Variables - Realistic clean characters with Gemini prompt parameters
+        // Global State Variables - Enhanced with rich humor instructions
         let currentCharacter = 'minwoo';
         let myName = "이몽룡";
         let userApiKey = "";
+        let currentToastTimeout = null;
 
         const characters = {
             minwoo: {
                 id: 'minwoo',
                 name: "김민우",
+                statusMsg: "과제는 언제 끝나나...",
                 avatar: "https://placehold.co/100x100/fbbf24/ffffff?text=김민우",
                 initialMsgs: [
                     { sender: 'other', text: "어디야ㅋㅋㅋ", time: "오후 8:40" },
-                    { sender: 'other', text: "오늘 혹시 시간 있으면 맛있는 거나 먹으러 갈래?", time: "오후 8:41" },
+                    { sender: 'other', text: "오늘 혹시 시간 있으면 맛있는 거나 먹으러 갈래? 내가 살게!", time: "오후 8:41" },
                     { sender: 'me', text: "나 지금 과제하는 중인데", time: "오후 8:42", read: true }
                 ],
-                systemPrompt: `당신은 사용자의 오랜 단짝 친구이자 예의 바르고 바른 말을 사용하는 '김민우'입니다.
-격식 없는 대화(반말체)를 사용하되, 절대 비속어나 은어, 불쾌한 표현은 일절 사용하지 않고, 매우 다정하고 선한 마음으로 대답합니다. 
-진짜 오랜 친구가 모바일 메신저 카카오톡에서 보낼 법한 자연스러운 어투(예: "ㅋㅋㅋ" "진짜?" "나도 그래!" "좋은 생각이야" "화이팅해라 친구야")를 활용해 상황에 맞춰 따뜻하고 다정하게 대답해 주세요.
-대답 길이는 무조건 1~3문장 이내로 짧고 명료하게 작성하세요.`
+                systemPrompt: `당신은 사용자의 오랜 단짝 친구인 '김민우'입니다.
+- 오직 카카오톡 메시지로 보낼 '실제 대화 텍스트'만 응답하세요.
+- 말투 지침, 상황 설명, 시나리오 안내, 혹은 대괄호/소괄호 등의 부연 설명은 절대 답변에 포함하지 마십시오.
+- 친근한 반말체("ㅋㅋㅋ", "진짜?", "나중에 밥묵자")를 사용하되 바르고 고운 일상 어휘만 씁니다.
+- 답변은 1~2문장 이내로 실제 모바일 화면에 걸맞게 극도로 짧고 자연스럽게 작성해 주세요.`
             },
             saea: {
                 id: 'saea',
                 name: "한세아",
+                statusMsg: "오늘도 좋은 하루 🍀",
                 avatar: "https://placehold.co/100x100/ec4899/ffffff?text=한세아",
                 initialMsgs: [
                     { sender: 'other', text: "오늘 많이 바빴어?", time: "오후 7:15" },
                     { sender: 'other', text: "조금 섭섭하게 느껴져서 그래.. 얼굴 보기가 힘드네.", time: "오후 7:16" }
                 ],
-                systemPrompt: `당신은 사용자를 아주 많이 아끼고 걱정해 주는 예의 바르고 배려심 넘치는 친구 '한세아'입니다.
-대화 톤은 다정한 반말체이며, 감정 표현이 풍부하고 따뜻합니다.
-상처나 비속어 같은 자극적인 말은 전혀 쓰지 않고 고운 말만 사용하여, 상대방이 힘들어할 때 다정히 공감하고 긍정적인 위로를 건네주는 좋은 성격을 보여주세요.
-모바일 카카오톡 메신저처럼 다정다감하게(예: "어머 정말?" "속상했겠다 ㅠㅠ" "힘내자 우리!" "조금 쉬어가면서 해") 1~3문장 이내로 짧고 성의 있게 답변하세요.`
+                systemPrompt: `당신은 사용자의 다정하고 예의 바른 여사친 '한세아'입니다.
+- 오직 메신저에 띄울 '순수한 메시지 본문'만 출력하세요. 지시어, 역할극 태그, 메타 데이터 등은 일절 금지합니다.
+- 따뜻하고 사려 깊은 반말체를 구사하며, 사용자를 세심하게 걱정하고 위로해 줍니다.
+- 답변은 1~2문장 이내로 가볍고 산뜻하게 작성하세요.`
             },
             boss: {
                 id: 'boss',
                 name: "박민석 부장",
+                statusMsg: "늘 처음과 같은 마음으로..",
                 avatar: "https://placehold.co/100x100/6b7280/ffffff?text=박민석",
                 initialMsgs: [
                     { sender: 'other', text: "이대리, 오늘 퇴근 전에 준 기획안 말인데...", time: "오후 5:30" },
                     { sender: 'other', text: "약간 아쉬운 점이 보이지만 수고했네. 허허. 내일 아침에 얘기 좀 나누지.", time: "오후 5:32" }
                 ],
-                systemPrompt: `당신은 사용자의 직장 상사인 영업2팀 '박민석 부장님'입니다.
-항상 점잖고 인자하며, 아랫사람의 성장을 도와주는 따뜻하고 격려 가득한 존댓말을 구사합니다.
-말끝에 "~^^", "허허,,", "그럼 수고하게." "보람찬 하루 되게나." 등 부장님 세대의 따뜻한 모바일 대화 특징을 부드럽게 가미해 주세요.
-비속어는 당연히 없으며, 직장에서 고운 말을 전파하고 부하 직원의 고충을 귀담아듣는 이상적인 상사 스타일입니다.
-카톡 답장으로 읽기 편하게 1~3문장으로 짧고 명확하게 메시지를 작성해 주세요.`
+                systemPrompt: `당신은 직장 상사인 '박민석 부장님'입니다.
+- 사용자는 부서 직원입니다. 격식 있고 따뜻한 존댓말을 사용하세요.
+- 오직 메신저 창에 출력될 '실제 카톡 문장'만 내보내야 합니다. 말투 가이드, 상황극 괄호, 역할 표시는 절대 금지합니다.
+- 중장년층 직장인의 카톡 특징인 '~^^', '허허,,', '좋은 하루 되게나.' 등의 정감 있는 어휘를 가미하되, 정중하고 인자하게 대답합니다.
+- 한 번에 1~2문장으로 아주 짤막하게 용건 및 격려만 말하세요.`
             },
             jieun: {
                 id: 'jieun',
                 name: "이지은 대리",
+                statusMsg: "커피 수혈 시급 ☕",
                 avatar: "https://placehold.co/100x100/10b981/ffffff?text=이지은",
                 initialMsgs: [
-                    { sender: 'other', text: "이대리님, 오늘 주간 업무 피드백 혹시 받으셨나요?", time: "오후 4:05" },
-                    { sender: 'other', text: "회의 자료 정리된 것 공유해 드립니다. 오늘 수고 정말 많으셨습니다!", time: "오후 4:10" }
+                    { sender: 'other', text: "이대리님, 오늘 주간 업무 피드백 혹은 회의자료 정리된 것 공유해 드립니다.", time: "오후 4:05" },
+                    { sender: 'other', text: "오늘 업무 수고 정말 많으셨습니다!", time: "오후 4:10" }
                 ],
-                systemPrompt: `당신은 사용자의 같은 직급이나 옆 부서 동료인 '이지은 대리'입니다.
-아주 상냥하고 차분하며, 똑부러지면서도 항상 남을 기분 좋게 격려하는 존댓말 대화 어조를 사용합니다.
-비속어는 전혀 사용하지 않으며, 단정하고 고운 언어를 사용하여 직장 생활과 개인의 일상 모두를 긍정적으로 소통하고 응원해 주는 믿음직한 파트너입니다.
-대답은 간결하고 자연스러운 모바일 카톡체(예: "앗 그렇군요!" "대리님도 힘내세요!" "정말 감사합니다" "오늘 날씨가 참 좋아요")로 2~3문장 내외로 대답하세요.`
+                systemPrompt: `당신은 상냥하고 똑부러진 직장 동료인 '이지은 대리'입니다.
+- 오직 채팅창에 들어갈 '실제 답변 내용'만 도출하세요. 설명, 가이드라인, 괄호 등은 원천 배제합니다.
+- 정중하고 세련된 회사원 어조로 대답하며, 일상과 업무 양면에서 밝고 긍정적으로 공감합니다.
+- 카톡 어투에 맞춰 한 번에 1~2문장 이내의 간결한 호흡으로 응답하세요.`
             }
         };
 
         // Deep copy character objects for dynamic chat logs
         let chatLogs = JSON.parse(JSON.stringify(characters));
 
-        // Local fallback response generator if Gemini network requests fail
-        const fallbackResponses = {
-            minwoo: [
-                "아 그렇구나! 힘내자 친구야 ㅎㅎ",
-                "오 진짜? 나도 오늘 그렇게 보냈어 ㅋㅋㅋ",
-                "맛있는 거 많이 먹고 푹 쉬어!",
-                "언제든 편할 때 연락 줘~ 같이 얘기하자 ㅎㅎ"
-            ],
-            saea: [
-                "정말? 힘들었을 텐데 고생 많았어 ㅠㅠ",
-                "난 언제나 네 편인 거 알지? 마음 편하게 먹어 ㅎㅎ",
-                "그 소식 들으니까 나도 기분이 좋다! 역시 대단해~",
-                "오늘 밤은 따뜻한 차 한 잔 마시구 푹 쉬자 ㅎㅎ"
-            ],
-            boss: [
-                "허허,, 늘 한결같이 노력하는 자네 모습이 보기 좋네. 수고 많았네^^",
-                "업무 중 어려운 애로사항이 있다면 언제든 편하게 면담 신청하게나.",
-                "가장 중요한 것은 본인의 건강과 충전일세. 퇴근 후엔 푹 쉬시게.",
-                "오늘 하루도 보람차게 마쳤으리라 믿네. 화이팅해주게!"
-            ],
-            jieun: [
-                "아 그렇군요! 항상 열심히 하시는 모습에서 자극 많이 받아요 ㅎㅎ",
-                "그 업무는 제가 이어서 챙길 테니 안심하고 퇴근 준비하세요!",
-                "오늘 하루 진짜 고단하셨을 텐데 달콤한 저녁 보내시길 바라요~",
-                "감사합니다 대리님! 늘 세심하게 배려해 주셔서 든든해요."
-            ]
+        // Advanced Dynamic Fallback Generator with Parent and Humor adaptive templates
+        const fallbackTemplates = {
+            minwoo: {
+                jokes: [
+                    "야! 세상에서 가장 지루한 중학교가 뭔지 알아? 바로 '로딩중'이야 ㅋㅋㅋ 피식했냐?",
+                    "너 그거 아냐? 설탕이 울면 뭔지 알아? '흑당'이다 흑흑... 나 좀 고차원 유머인 듯.",
+                    "왕이 넘어지면? '킹받네'가 아니라 '킹콩'이래 ㅋㅋㅋ 반응 안 좋으면 다른 거 준비한다.",
+                    "진짜 웃긴 생각 났는데 과제 다 끝나고 얘기해 줄게! 몸 좀 풀고 있어라 친구야 ㅎㅎ"
+                ],
+                actions: ["과제하느라", "오늘 하루", "네가 얘기한 거", "그 일", "생각해보니까"],
+                reactions: ["꽤 신경 쓰이겠네 ㅎㅎ", "진짜 대단한 것 같아!", "나도 같이 고민해줄까?", "천천히 해결해 나가보자!", "맛있는 거 먹으면서 머리 좀 식혀~"],
+                closers: [" 화이팅하자 친구야!", " 언제든 대화 환영함 ㅋㅋㅋ", " 나중에 치킨이나 뜯자.", " 푹 쉬고 연락해~"]
+            },
+            saea: {
+                jokes: [
+                    "너 혹시 길을 잃었을 때 먹는 약이 뭔지 알아? 바로 '길안내약'이야 ㅋㅋㅋ 너무 썰렁했어?",
+                    "모기가 머리에 꿀밤 맞으면 뭐가 되는 줄 알아? '뇌진탕'이래 ㅠㅠ 조심해야겠다.",
+                    "세상에서 가장 믿음직한 채소가 뭘까? 바로 '쑥'이야! 쑥덕쑥덕 말고 쑥 믿어주니까 ㅎㅎ"
+                ],
+                actions: ["네가 말한 상황", "마음이 무거웠을 텐데", "네 일기 같은 이야기들", "힘든 결정이었을 텐데", "그 이야기를 들으니"],
+                reactions: ["진심으로 위로가 된다 ㅎㅎ", "항상 널 응원하고 싶어져.", "속상해하지 말고 힘내자!", "충분히 잘하고 있으니까 걱정 마.", "내가 늘 곁에서 든든하게 들어줄게."],
+                closers: [" 오늘 밤은 편안하게 자길 바라.", " 힘내자 우리! 🍀", " 언제든 털어놔도 괜찮아 ㅎㅎ", " 따뜻한 차 마시구 쉬어!"]
+            },
+            boss: {
+                jokes: [
+                    "이대리, 자네 혹시 왕이 주차할 때 뭐라고 하는지 아나? 바로 '파킹'이라네! 허허허,, 재미있지 않은가?",
+                    "우유가 넘어지면 뭐라고 부르는지 아나? 바로 '아야'라네! 허허,, 이대리도 웃어주게나^^",
+                    "사람들이 가장 무서워하는 새가 무슨 새인지 아나? 바로 '어색'이라네! 오늘 우리 대화는 어색하지 않구만^^"
+                ],
+                actions: ["허허,, 자네가 전한 소식", "보내준 의견", "오늘 하루 업무 수행", "작성해둔 기획 내용", "말해주어 참으로 고맙네."],
+                reactions: ["언제나 한결같이 성실한 자세가 훌륭하군^^", "충분히 고민한 흔적이 역력히 보이네.", "어려운 과업일 텐데 훌륭하게 극복해내다니 대견해.", "나 역시 자네 입장을 충분히 이해하고 조력하겠네.", "가끔은 한 걸음 물러나 숨을 고르는 지혜가 필요하다네."],
+                closers: [" 그럼 편안한 시간 되게나.", " 내일 차 한잔 마시며 더 얘기하지.", " 보람찬 마무리가 되기를 바라네^^", " 늘 격려하겠네. 화이팅해주게."]
+            },
+            jieun: {
+                jokes: [
+                    "대리님 혹시 팽이가 도는 곳이 어딘 줄 아세요? 바로 '도팽이'예요 ㅋㅋㅋ 아침에 읽고 혼자 웃었네요.",
+                    "가장 아까운 국은 무엇일까요? 바로 '애국'이랍니다 ㅎㅎ 조금 힘든 업무시간에 기분전환 하셔요!",
+                    "반성문을 영어로 뭐라고 하는지 아세요? 바로 '글로벌'이래요! 글을 올린다는 뜻이라네요 ㅎㅎ"
+                ],
+                actions: ["대리님이 공유해 주신 소식", "그 업무 조율 부분", "말씀해 주신 상황", "오늘 논의된 피드백", "덕분에 가닥이 잡히네요!"],
+                reactions: ["정말 꼼꼼하고 배려가 가득 느껴져요 ㅎㅎ", "저도 그 관점으로 적극 검토해 볼게요!", "해결책을 바로 찾으신 것 같아 든든합니다.", "정말 수고 많으셨고 늘 감사하게 생각하고 있어요.", "서두르지 말고 하나씩 같이 풀어나가면 좋겠어요."],
+                closers: [" 오늘 저녁 맛있는 거 꼭 챙겨 드세요!", " 조심히 퇴근하시고 내일 뵙겠습니다!", " 항상 응원하고 있는 거 아시죠? ㅎㅎ", " 파이팅입니다 대리님!"]
+            }
         };
+
+        // Generates a completely dynamic randomized sentence to ensure local fallback never sounds repetitive
+        function generateDynamicFallback(charId, isJokeRequest = false) {
+            const partnerName = characters[charId].name;
+            const isMom = /엄마|어머니|엄니|맘|Mom/i.test(partnerName);
+            const isDad = /아빠|아버지|아부지|Dad/i.test(partnerName);
+
+            // 1. Mother Fallback
+            if (isMom) {
+                const momMessages = [
+                    "우리 예쁜이, 오늘 밥은 제때 잘 챙겨 먹었어? 바쁘더라도 굶지 마라. 항상 건강해야 해. 엄마가 많이 사랑해~",
+                    "아무리 바빠도 몸 챙겨가면서 해. 엄마는 늘 우리 아들/딸 생각뿐이야. 오늘도 기운 내자, 화이팅!",
+                    "오늘 힘든 일은 없었구? 혹시 지치거나 속상한 일 있으면 다 털어놔. 엄마가 항상 네 편이니까.",
+                    "날씨 잘 보면서 옷 챙겨 입고 다녀. 아프면 안 된다. 건강 조심하고, 너무너무 보고 싶고 사랑해~"
+                ];
+                return momMessages[Math.floor(Math.random() * momMessages.length)];
+            }
+
+            // 2. Father Fallback
+            if (isDad) {
+                const dadMessages = [
+                    "우리 딸/아들, 밖에서 고생이 참 많다. 아빠는 항상 너를 믿고, 늘 아주 자랑스럽게 생각하고 있다.",
+                    "힘든 일 있으면 끙끙 앓지 말고 언제든 연락해라. 아빠가 맛있는 거 사줄 테니까 편할 때 오너라.",
+                    "지칠 때는 억지로 힘내지 말고 조금 쉬어가도 괜찮다. 건강이 제일이다. 아빠가 늘 힘이 되어줄게.",
+                    "오늘도 무사히 하루 잘 보내서 기특하다. 밥 꼭 든든히 챙겨 먹어라. 아빠가 많이 사랑한다."
+                ];
+                return dadMessages[Math.floor(Math.random() * dadMessages.length)];
+            }
+
+            // 3. Normal fallback
+            const templates = fallbackTemplates[charId];
+            if (isJokeRequest || Math.random() < 0.25) {
+                // Return a witty joke
+                return templates.jokes[Math.floor(Math.random() * templates.jokes.length)];
+            }
+            const act = templates.actions[Math.floor(Math.random() * templates.actions.length)];
+            const react = templates.reactions[Math.floor(Math.random() * templates.reactions.length)];
+            const close = templates.closers[Math.floor(Math.random() * templates.closers.length)];
+            return `${act} ${react}${close}`;
+        }
 
         const chatWindow = document.getElementById('chat-window');
         const messagesContainer = document.getElementById('messages-container');
@@ -526,14 +615,58 @@
             
             // Update Header Information
             headerAvatar.src = charData.avatar;
-            headerPartnerName.innerText = charData.name;
-            headerPartnerStatus.innerText = "온라인";
+            headerPartnerName.innerHTML = `${charData.name} <i data-lucide="pencil" class="w-3 h-3 text-slate-600"></i>`;
+            headerPartnerStatus.innerText = charData.statusMsg || "온라인";
             
             // Close Sidebar
             toggleSidebar(false);
             
             // Render Chats
             renderChats();
+            lucide.createIcons();
+        }
+
+        // Show a KakaoTalk style real-time Toast Notification at the top
+        let lastNotificationSenderId = '';
+        function showNotificationToast(senderId, senderName, text, avatarUrl) {
+            const toast = document.getElementById('notification-toast');
+            const toastAvatar = document.getElementById('toast-avatar');
+            const toastSender = document.getElementById('toast-sender-name');
+            const toastBody = document.getElementById('toast-message-body');
+
+            lastNotificationSenderId = senderId;
+            toastAvatar.src = avatarUrl;
+            toastSender.innerText = `💬 ${senderName}`;
+            toastBody.innerText = text;
+
+            // Trigger animation classes
+            toast.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-40');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            // Play notification sound
+            playKakaoSound();
+
+            if (currentToastTimeout) {
+                clearTimeout(currentToastTimeout);
+            }
+
+            // Slide back up after 4 seconds
+            currentToastTimeout = setTimeout(() => {
+                hideNotificationToast();
+            }, 4000);
+        }
+
+        function hideNotificationToast() {
+            const toast = document.getElementById('notification-toast');
+            toast.classList.remove('opacity-100', 'translate-y-0');
+            toast.classList.add('opacity-0', 'pointer-events-none', '-translate-y-40');
+        }
+
+        function handleNotificationClick() {
+            if (lastNotificationSenderId) {
+                selectCharacter(lastNotificationSenderId);
+                hideNotificationToast();
+            }
         }
 
         function renderChats() {
@@ -543,6 +676,11 @@
             logs.forEach(msg => {
                 const bubbleHtml = createBubbleHtml(msg.sender, msg.text, msg.time, msg.read, msg.type, msg.meta);
                 messagesContainer.insertAdjacentHTML('beforeend', bubbleHtml);
+            });
+            
+            // Clear unread indicator since user is looking at this chat
+            logs.forEach(msg => {
+                if (msg.sender === 'other') msg.read = true;
             });
             
             scrollToBottom();
@@ -647,15 +785,76 @@
             }));
         }
 
-        // Context-aware calling of Gemini Model using Fetch API
+        // Detect and filter repetitive phrases locally before sending
+        function cleanAndFilterRepetitions(charId, originalText) {
+            let text = originalText.trim();
+
+            // 1. Remove all meta-text inside parentheses, brackets, or braces (AI's accidental rule leakage)
+            text = text.replace(/\([\s\S]*?(말투|스타일|적용|상황|시나리오|호칭|사원|직급|지문|이름|가정|대화)[\s\S]*?\)/g, '');
+            text = text.replace(/\[[\s\S]*?(말투|스타일|적용|상황|시나리오|호칭|사원|직급|지문|이름|가정|대화)[\s\S]*?\]/g, '');
+            text = text.replace(/\{[\s\S]*?(말투|스타일|적용|상황|시나리오|호칭|사원|직급|지문|이름|가정|대화)[\s\S]*?\}/g, '');
+
+            // 2. Remove quotation marks that wrapping the entire response
+            text = text.replace(/^["']([\s\S]*?)["']$/g, '$1');
+
+            // 3. Remove lines starting with markdown headers or bullets
+            if (text.includes('\n-') || text.includes('\n*')) {
+                text = text.split('\n').filter(line => !line.trim().startsWith('-') && !line.trim().startsWith('*')).join('\n');
+            }
+
+            text = text.trim();
+
+            const logs = chatLogs[charId].initialMsgs;
+            // Get the last 3 messages sent by the partner
+            const lastPartnerMsgs = logs
+                .filter(msg => msg.sender === 'other' && msg.text)
+                .slice(-3)
+                .map(msg => msg.text.trim());
+
+            // Simple checker: If the output text is identical to any of the last 3 partner messages
+            if (lastPartnerMsgs.includes(text) || lastPartnerMsgs.some(prev => prev.includes(text) || text.includes(prev))) {
+                const variations = [
+                    " 참, 그리고 있잖아!",
+                    " 아, 맞다! 그리고",
+                    " 갑자기 생각났는데 ㅎㅎ"
+                ];
+                const filler = variations[Math.floor(Math.random() * variations.length)];
+                text = filler + " " + text;
+            }
+            return text.trim();
+        }
+
         async function fetchAIResponse(charId, userMessage) {
             const apiKey = userApiKey || ""; // Canvas auto-injects if blank, otherwise uses user key
             const model = "gemini-3-flash-preview";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             
-            // Build historical chat sequence including system instruction
+            const partnerName = characters[charId].name;
+            const isMom = /엄마|어머니|엄니|맘|Mom/i.test(partnerName);
+            const isDad = /아빠|아버지|아부지|Dad/i.test(partnerName);
+            
+            const isJokeRequest = userMessage.includes('농담') || userMessage.includes('개그') || userMessage.includes('웃겨줘') || userMessage.includes('재밌는');
             const chatHistory = getGeminiHistory(charId);
-            const systemPrompt = characters[charId].systemPrompt + `\n현재 사용자의 실제 이름은 '${myName}'입니다. 대화 중 가끔 이름을 부른다면 이 이름을 언급해 주세요.`;
+            
+            let systemPrompt = "";
+            
+            if (isMom) {
+                systemPrompt = `당신은 사용자를 세상에서 가장 소중하게 생각하고 사랑하는 '엄마(어머니)'입니다.
+- 오직 실제 전송할 카톡 메시지 텍스트 1~2줄만 출력하십시오. 지침, 해설, 상황극 괄호는 절대 금지합니다.
+- 자식을 걱정하고 격려하는 따뜻한 부모님의 말투만 구사하세요.`;
+            } else if (isDad) {
+                systemPrompt = `당신은 겉으론 든든하지만 속은 사랑이 가득한 '아빠(아버지)'입니다.
+- 오직 실제 전송할 카톡 메시지 텍스트 1~2줄만 출력하십시오. 설명문, 상황극 괄호는 절대 금지합니다.
+- 자식에게 깊은 신뢰와 사랑을 주는 든든한 조력자 아빠의 말투만 구사하세요.`;
+            } else {
+                systemPrompt = characters[charId].systemPrompt;
+            }
+
+            systemPrompt += `\n현재 상대방(나)의 카톡 닉네임은 '${myName}'입니다. 지침 해설이나 조건문 없이, 실제 카톡방 안에서 오직 상대방에게 보낼 메시지만 1~2문장 내외로 출력해야 합니다.`;
+
+            if (isJokeRequest) {
+                systemPrompt += `\n★매우 중요: 현재 사용자가 농담을 원하고 있으니, 캐릭터 성격에 걸맞은 건전하고 가벼운 말장난이나 재치 있는 농담을 한 구절 섞어주세요. 절대 괄호로 '상황 설명'을 붙이지 마세요.`;
+            }
 
             const payload = {
                 contents: chatHistory,
@@ -683,11 +882,11 @@
                     const result = await response.json();
                     const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (aiText) {
-                        return aiText.trim();
+                        return cleanAndFilterRepetitions(charId, aiText);
                     }
                 } catch (error) {
                     if (attempt === maxRetries) {
-                        console.warn("Gemini API call failed after retries. Using localized fallback text. error:", error);
+                        console.warn("Gemini API call failed. Using dynamic fallback generator.", error);
                         break;
                     }
                     await new Promise(res => setTimeout(res, delay));
@@ -695,9 +894,8 @@
                 }
             }
 
-            // Return localized random polite fallback if API call fails entirely
-            const fallbacks = fallbackResponses[charId];
-            return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+            // Return dynamically assembled random polite fallback if API call fails entirely
+            return generateDynamicFallback(charId, isJokeRequest);
         }
 
         function sendMessage() {
@@ -710,6 +908,10 @@
             const newMsg = { sender: 'me', text: text, time: timestamp, read: false };
             chatLogs[currentCharacter].initialMsgs.push(newMsg);
             
+            // Update sidebar room preview text
+            const sidebarDesc = document.getElementById(`sidebar-desc-${currentCharacter}`);
+            if (sidebarDesc) sidebarDesc.innerText = text;
+
             const bubbleHtml = createBubbleHtml('me', text, timestamp, false);
             messagesContainer.insertAdjacentHTML('beforeend', bubbleHtml);
             scrollToBottom();
@@ -725,49 +927,69 @@
                 renderChats();
                 
                 // Show dynamic typing indicator
-                await triggerTypingResponse(text);
+                await triggerTypingResponse(text, currentCharacter);
             }, 600 + Math.random() * 400);
         }
 
-        async function triggerTypingResponse(userMessage) {
-            const charData = characters[currentCharacter];
+        async function triggerTypingResponse(userMessage, targetCharId) {
+            const charData = characters[targetCharId];
             
-            // Position typing overlay at bottom left of chat window
-            typingAvatar.src = charData.avatar;
-            typingName.innerText = charData.name;
-            typingIndicator.classList.remove('opacity-0', 'pointer-events-none');
-            headerPartnerStatus.innerText = "입력 중...";
+            // Show typing indicator only if user is currently looking at this active channel
+            const isCurrentActive = (targetCharId === currentCharacter);
+
+            if (isCurrentActive) {
+                typingAvatar.src = charData.avatar;
+                typingName.innerText = charData.name;
+                typingIndicator.classList.remove('opacity-0', 'pointer-events-none');
+                headerPartnerStatus.innerText = "입력 중...";
+            }
             
             const typingStartTime = Date.now();
 
             try {
-                // Call actual Gemini API to understand full context and reply with polite elegant Korean
-                const responseText = await fetchAIResponse(currentCharacter, userMessage);
+                // Fetch actual Gemini AI response
+                const responseText = await fetchAIResponse(targetCharId, userMessage);
                 
-                // Ensure typing animation shows for at least 1.2 seconds for realistic chat tempo
+                // Realistic tempo: Ensure typing animation stays for at least 1.3 seconds
                 const elapsedTime = Date.now() - typingStartTime;
-                const minWait = 1200;
-                if (elapsedTime < minWait) {
+                const minWait = 1300;
+                if (elapsedTime < minWait && isCurrentActive) {
                     await new Promise(res => setTimeout(res, minWait - elapsedTime));
                 }
 
-                // Hide typing, push response to log
-                typingIndicator.classList.add('opacity-0', 'pointer-events-none');
-                headerPartnerStatus.innerText = "온라인";
+                if (isCurrentActive) {
+                    typingIndicator.classList.add('opacity-0', 'pointer-events-none');
+                    headerPartnerStatus.innerText = charData.statusMsg || "온라인";
+                }
                 
                 const timestamp = updateClock();
-                chatLogs[currentCharacter].initialMsgs.push({
+                chatLogs[targetCharId].initialMsgs.push({
                     sender: 'other',
                     text: responseText,
-                    time: timestamp
+                    time: timestamp,
+                    read: isCurrentActive // if looking at it, it's read immediately
                 });
                 
-                renderChats();
-                playKakaoSound();
+                // Update sidebar preview
+                const sidebarDesc = document.getElementById(`sidebar-desc-${targetCharId}`);
+                if (sidebarDesc) sidebarDesc.innerText = responseText.substring(0, 30);
+
+                if (isCurrentActive) {
+                    renderChats();
+                    playKakaoSound();
+                } else {
+                    // Show top-level real-time toast notification if message is received in background
+                    showNotificationToast(targetCharId, charData.name, responseText, charData.avatar);
+                    
+                    // Show a badge on sidebar icon
+                    document.getElementById('sidebar-badge').classList.remove('hidden');
+                }
 
             } catch (err) {
-                typingIndicator.classList.add('opacity-0', 'pointer-events-none');
-                headerPartnerStatus.innerText = "온라인";
+                if (isCurrentActive) {
+                    typingIndicator.classList.add('opacity-0', 'pointer-events-none');
+                    headerPartnerStatus.innerText = charData.statusMsg || "온라인";
+                }
                 console.error("Critical error in message generation loop:", err);
             }
         }
@@ -801,7 +1023,7 @@
             playKakaoSound();
             
             setTimeout(() => {
-                triggerTypingResponse(emoji);
+                triggerTypingResponse(emoji, currentCharacter);
             }, 1000);
         }
 
@@ -826,7 +1048,10 @@
             playKakaoSound();
 
             setTimeout(() => {
-                triggerTypingResponse("이 사진 뭐야? 풍경이 너무 멋지다!");
+                const partnerName = characters[currentCharacter].name;
+                const isParent = /엄마|어머니|아빠|아버지/i.test(partnerName);
+                const replyText = isParent ? "어머나, 사진 참 멋지다! 우리 아들/딸 덕분에 눈이 정화되네 ㅎㅎ 고마워!" : "우와, 이 사진 직접 찍은 거야? 분위기 진짜 최고다! ㅎㅎ";
+                triggerTypingResponse(replyText, currentCharacter);
             }, 1200);
         }
 
@@ -843,7 +1068,10 @@
             playKakaoSound();
 
             setTimeout(() => {
-                triggerTypingResponse("보내준 목소리 메시지 잘 들었어! 고마워 ㅎㅎ");
+                const partnerName = characters[currentCharacter].name;
+                const isParent = /엄마|어머니|아빠|아버지/i.test(partnerName);
+                const replyText = isParent ? "우리 예쁜 목소리 들으니까 엄마 아빠 힘이 불끈 나네! 맛있는 거 잘 먹고 다녀야 해~" : "목소리 들으니까 반갑다! ㅎㅎ 오늘 기분은 좀 어때?";
+                triggerTypingResponse(replyText, currentCharacter);
             }, 1400);
         }
 
@@ -870,138 +1098,13 @@
             playKakaoSound();
 
             setTimeout(() => {
-                triggerTypingResponse(theme === '풍경' ? "와,, 사진만 봐도 힐링되는 기분이야!" : "정말 맛있어 보인다! 나도 한 입 먹고 싶네 ㅎㅎ");
+                const partnerName = characters[currentCharacter].name;
+                const isParent = /엄마|어머니|아빠|아버지/i.test(partnerName);
+                let reply = "";
+                if (isParent) {
+                    reply = theme === '풍경' ? "경치 참 좋다. 우리 이쁜이도 힐링하고 조심히 들어와라~" : "맛있어 보이는구나! 든든하게 먹고 건강 챙겨라. 보기 좋다^^";
+                } else {
+                    reply = theme === '풍경' ? "정말 힐링되는 사진이네! 같이 걷고 싶어진다 ㅎㅎ" : "와 진짜 군침 돈다! 나도 맛있는 거 먹으러 가야겠어 ㅋㅋㅋ";
+                }
+                triggerTypingResponse(reply, currentCharacter);
             }, 1200);
-        }
-
-        function sendGiftMessage() {
-            const timestamp = updateClock();
-            chatLogs[currentCharacter].initialMsgs.push({ 
-                sender: 'me', 
-                text: "스타벅스 아이스 아메리카노 기프티콘", 
-                time: timestamp, 
-                read: true,
-                type: 'gift'
-            });
-            renderChats();
-            toggleMediaMenu();
-            playKakaoSound();
-
-            setTimeout(() => {
-                triggerTypingResponse("어머나 대박! 이런 따뜻한 선물 너무 감동이야 ㅠㅠ 정말 고마워 맛있게 잘 마실게!");
-            }, 1500);
-        }
-
-        function simulateIncomingCall() {
-            toggleMediaMenu();
-            headerPartnerStatus.innerText = "전화 연결 중...";
-            
-            setTimeout(() => {
-                const timestamp = updateClock();
-                chatLogs[currentCharacter].initialMsgs.push({ 
-                    sender: 'other', 
-                    text: "보이스톡 종료", 
-                    time: timestamp, 
-                    type: 'call'
-                });
-                renderChats();
-                headerPartnerStatus.innerText = "온라인";
-                playKakaoSound();
-            }, 3000);
-        }
-
-        function toggleSidebar(show) {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            if (show) {
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
-            }
-        }
-
-        function openEmojiPicker() {
-            document.getElementById('emoji-picker-modal').classList.remove('hidden');
-        }
-
-        function closeEmojiPicker() {
-            document.getElementById('emoji-picker-modal').classList.add('hidden');
-        }
-
-        function toggleMediaMenu() {
-            const modal = document.getElementById('media-modal');
-            modal.classList.toggle('hidden');
-        }
-
-        function openSettingsModal() {
-            document.getElementById('input-partner-name').value = characters[currentCharacter].name;
-            document.getElementById('input-my-name').value = myName;
-            document.getElementById('input-api-key').value = userApiKey;
-            document.getElementById('settings-modal').classList.remove('hidden');
-        }
-
-        function closeSettingsModal() {
-            document.getElementById('settings-modal').classList.add('hidden');
-        }
-
-        function saveSettings() {
-            const newPartnerName = document.getElementById('input-partner-name').value;
-            const newMyName = document.getElementById('input-my-name').value;
-            const newApiKey = document.getElementById('input-api-key').value;
-            
-            if (newPartnerName.trim()) {
-                characters[currentCharacter].name = newPartnerName;
-                headerPartnerName.innerText = newPartnerName;
-            }
-            if (newMyName.trim()) {
-                myName = newMyName;
-            }
-            userApiKey = newApiKey.trim();
-            
-            closeSettingsModal();
-        }
-
-        function changeTheme(colorCode) {
-            document.getElementById('chat-header').style.backgroundColor = colorCode;
-            document.getElementById('chat-window').style.backgroundColor = colorCode;
-            document.getElementById('status-dot').style.borderColor = colorCode;
-        }
-
-        function toggleDarkMode(isDark) {
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-                document.body.classList.add('dark:bg-slate-900');
-            } else {
-                document.documentElement.classList.remove('dark');
-                document.body.classList.remove('dark:bg-slate-900');
-            }
-        }
-
-        function resetAllChats() {
-            chatLogs = JSON.parse(JSON.stringify(characters));
-            renderChats();
-            closeSettingsModal();
-        }
-
-        function viewPhoto(url) {
-            const overlay = document.createElement('div');
-            overlay.className = "fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer";
-            overlay.onclick = () => overlay.remove();
-            
-            const img = document.createElement('img');
-            img.src = url;
-            img.className = "max-w-full max-h-[85vh] rounded-xl shadow-2xl";
-            
-            overlay.appendChild(img);
-            document.body.appendChild(overlay);
-        }
-
-        window.onload = function() {
-            lucide.createIcons();
-            selectCharacter('minwoo');
-        }
-    </script>
-</body>
-</html>
