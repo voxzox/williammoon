@@ -1108,3 +1108,184 @@
                 }
                 triggerTypingResponse(reply, currentCharacter);
             }, 1200);
+        }
+
+        function sendGiftMessage() {
+            const timestamp = updateClock();
+            chatLogs[currentCharacter].initialMsgs.push({ 
+                sender: 'me', 
+                text: "스타벅스 아이스 아메리카노 기프티콘", 
+                time: timestamp, 
+                read: true,
+                type: 'gift'
+            });
+            renderChats();
+            toggleMediaMenu();
+            playKakaoSound();
+
+            setTimeout(() => {
+                const partnerName = characters[currentCharacter].name;
+                const isParent = /엄마|어머니|아빠|아버지/i.test(partnerName);
+                const replyText = isParent ? "아이구, 우리 딸/아들이 보낸 사랑에 눈물이 나려 그러네. 시원하게 아주 고맙게 잘 마실게, 고맙고 사랑해~" : "앗! 이렇게 깜짝 선물을 주다니 너무 고마워 ㅠㅠ 감동이야, 시원하게 잘 마실게!";
+                triggerTypingResponse(replyText, currentCharacter);
+            }, 1500);
+        }
+
+        function simulateIncomingCall() {
+            toggleMediaMenu();
+            headerPartnerStatus.innerText = "전화 연결 중...";
+            
+            setTimeout(() => {
+                const timestamp = updateClock();
+                chatLogs[currentCharacter].initialMsgs.push({ 
+                    sender: 'other', 
+                    text: "보이스톡 종료", 
+                    time: timestamp, 
+                    type: 'call'
+                });
+                renderChats();
+                headerPartnerStatus.innerText = characters[currentCharacter].statusMsg || "온라인";
+                playKakaoSound();
+            }, 3000);
+        }
+
+        function toggleSidebar(show) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (show) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+                document.getElementById('sidebar-badge').classList.add('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function openEmojiPicker() {
+            document.getElementById('emoji-picker-modal').classList.remove('hidden');
+        }
+
+        function closeEmojiPicker() {
+            document.getElementById('emoji-picker-modal').classList.add('hidden');
+        }
+
+        function toggleMediaMenu() {
+            const modal = document.getElementById('media-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function openSettingsModal() {
+            document.getElementById('input-partner-name').value = characters[currentCharacter].name;
+            document.getElementById('input-partner-status-msg').value = characters[currentCharacter].statusMsg || "온라인";
+            document.getElementById('input-my-name').value = myName;
+            document.getElementById('input-api-key').value = userApiKey;
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const newPartnerName = document.getElementById('input-partner-name').value.trim();
+            const newPartnerStatusMsg = document.getElementById('input-partner-status-msg').value.trim();
+            const newMyName = document.getElementById('input-my-name').value.trim();
+            const newApiKey = document.getElementById('input-api-key').value.trim();
+            
+            if (newPartnerName) {
+                characters[currentCharacter].name = newPartnerName;
+                
+                // Update avatar placeholder text with edited name
+                const shortName = newPartnerName.substring(0, 2);
+                const bgColors = { minwoo: 'fbbf24', saea: 'ec4899', boss: '6b7280', jieun: '10b981' };
+                const color = bgColors[currentCharacter] || '3b82f6';
+                characters[currentCharacter].avatar = `https://placehold.co/100x100/${color}/ffffff?text=${encodeURIComponent(shortName)}`;
+                
+                // Update Sidebar labels
+                const nameLabel = document.getElementById(`sidebar-name-${currentCharacter}`);
+                if (nameLabel) nameLabel.innerText = newPartnerName;
+                
+                const avatarImg = document.getElementById(`sidebar-avatar-${currentCharacter}`);
+                if (avatarImg) avatarImg.src = characters[currentCharacter].avatar;
+
+                // Update Active header
+                headerPartnerName.innerHTML = `${newPartnerName} <i data-lucide="pencil" class="w-3 h-3 text-slate-600"></i>`;
+                headerAvatar.src = characters[currentCharacter].avatar;
+            }
+
+            if (newPartnerStatusMsg) {
+                characters[currentCharacter].statusMsg = newPartnerStatusMsg;
+                headerPartnerStatus.innerText = newPartnerStatusMsg;
+            }
+
+            if (newMyName) {
+                myName = newMyName;
+            }
+            
+            userApiKey = newApiKey;
+            
+            closeSettingsModal();
+            lucide.createIcons();
+            renderChats();
+        }
+
+        function changeTheme(colorCode) {
+            document.getElementById('chat-header').style.backgroundColor = colorCode;
+            document.getElementById('chat-window').style.backgroundColor = colorCode;
+            document.getElementById('status-dot').style.borderColor = colorCode;
+        }
+
+        function toggleDarkMode(isDark) {
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                document.body.classList.add('dark:bg-slate-900');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.body.classList.remove('dark:bg-slate-900');
+            }
+        }
+
+        function resetAllChats() {
+            chatLogs = JSON.parse(JSON.stringify(characters));
+            renderChats();
+            closeSettingsModal();
+        }
+
+        function viewPhoto(url) {
+            const overlay = document.createElement('div');
+            overlay.className = "fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer animate-fade-in";
+            overlay.onclick = () => overlay.remove();
+            
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = "max-w-full max-h-[85vh] rounded-xl shadow-2xl transition-transform duration-300 transform scale-95 hover:scale-100";
+            
+            overlay.appendChild(img);
+            document.body.appendChild(overlay);
+        }
+
+        window.onload = function() {
+            lucide.createIcons();
+            selectCharacter('minwoo');
+            
+            // Randomly trigger an incoming background message from another character after 6 seconds to show off the toast/VAD notification
+            setTimeout(() => {
+                const backgroundChars = ['saea', 'boss', 'jieun'];
+                const randomId = backgroundChars[Math.floor(Math.random() * backgroundChars.length)];
+                
+                let text = "오늘 좋은 하루 보내고 계신가요?";
+                if (randomId === 'boss') {
+                    text = "이대리, 세상에서 가장 아름다운 고양이는 뭔지 아나? 바로 '무지개냥'이라네! 허허허,, 즐거운 오후 보내게나^^";
+                } else if (randomId === 'saea') {
+                    text = "너 아까 길에서 지나치지 않았어? ㅋㅋㅋ 암튼 날씨 엄청 좋다!";
+                } else if (randomId === 'jieun') {
+                    text = "대리님, 세상에서 가장 뜨거운 과일이 뭔지 아세요? 바로 '천혜향'이래요! 오늘도 파이팅해요! ㅎㅎ";
+                }
+                
+                triggerTypingResponse(text, randomId);
+            }, 6000);
+        }
+    </script>
+</body>
+</html>
