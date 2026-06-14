@@ -1,0 +1,2356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Retro City Top-Down Action & Driving</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0f172a;
+        }
+        #gameCanvas {
+            image-rendering: pixelated;
+        }
+        .joystick-zone {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="overflow-hidden w-screen h-screen flex flex-col items-center justify-center relative">
+
+    <!-- -->
+    <!-- 메인 로비 / 시작 화면 -->
+    <div id="mainMenu" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/95 text-white transition-opacity duration-300 px-6 text-center">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+            <div class="space-y-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">GTA 2 Inspired Living Traffic</span>
+                <h1 class="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 via-amber-500 to-yellow-500">RETRO CITY TRAFFIC</h1>
+                <p class="text-xs text-slate-400">차선 정렬, 신호등 준수, 보행자 횡단까지! 완벽한 물리 교통 체계가 정립된 도시에서 난폭 주행과 사격 생존 액션을 펼치세요.</p>
+            </div>
+
+            <!-- 게임 가이드 및 조작 안내 -->
+            <div class="text-left text-xs text-slate-300 space-y-2 bg-slate-950/60 p-4 rounded-lg border border-slate-800/80">
+                <div class="flex items-center gap-2 text-amber-500 font-semibold mb-1">
+                    <i class="fa-solid fa-gamepad text-sm"></i> 교통 & 전투 조작 가이드
+                </div>
+                <p><strong>[이동/운전]</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">W</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">A</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">S</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">D</kbd> 또는 방향키</p>
+                <p><strong>[차량 탑승/하차]</strong> 차량 근처에서 <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Enter</kbd> 키 입력</p>
+                <p><strong>[조준/발사]</strong> 마우스 이동으로 조준 + 좌클릭 격발 (보행 시 가능)</p>
+                <p><strong>[무기 교체]</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">1</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">2</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">3</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">4</kbd> 숫자키</p>
+                <p><strong>[재장전]</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">R</kbd> 키</p>
+                <div class="border-t border-slate-800/80 my-2 pt-2 text-[10px] text-slate-400">
+                    * <strong>차량 충돌 데미지</strong>: 차끼리 강하게 충돌하면 속도에 비례해 차의 내구도가 파괴됩니다.
+                </div>
+                <div class="border-t border-slate-800/80 pt-2 text-[10px] text-amber-400">
+                    * <strong>신호 체계</strong>: 시민 차량은 교통 신호를 준수하지만 공격받거나 사격을 받으면 차에서 내려 패닉 상태로 탈출합니다.
+                </div>
+            </div>
+
+            <button id="startGameBtn" class="w-full py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black rounded-xl shadow-lg transition duration-200 transform active:scale-98 text-base">
+                무법 도시 입장하기
+            </button>
+        </div>
+    </div>
+
+    <!-- 인게임 HUD 오버레이 -->
+    <div id="gameHud" class="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-4 opacity-0 transition-opacity duration-500">
+        <!-- 상단 헤더: 수배 등급 및 점수 -->
+        <div class="flex justify-between items-start w-full">
+            <!-- 무기 및 체력 바 -->
+            <div class="flex items-center gap-4 bg-slate-950/95 border border-slate-800 p-3 rounded-2xl pointer-events-auto shadow-2xl max-w-xs w-full">
+                <div class="w-12 h-12 rounded-full bg-slate-800 border-2 border-amber-500 flex items-center justify-center overflow-hidden">
+                    <svg viewBox="0 0 100 100" class="w-8 h-8 text-amber-500 fill-current">
+                        <circle cx="50" cy="50" r="25"/>
+                        <circle cx="35" cy="40" r="8" fill="#1e293b" />
+                        <circle cx="65" cy="40" r="8" fill="#1e293b" />
+                    </svg>
+                </div>
+                <div class="flex-1 space-y-1">
+                    <div class="flex justify-between text-xs text-slate-300 font-bold">
+                        <span>HEALTH</span>
+                        <span id="healthText">100 / 100</span>
+                    </div>
+                    <div class="w-full h-3 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
+                        <div id="healthBar" class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-150" style="width: 100%;"></div>
+                    </div>
+                    <!-- 스태미나 바 -->
+                    <div class="w-full h-1.5 bg-slate-900 border border-slate-800/40 rounded-full overflow-hidden">
+                        <div id="staminaBar" class="h-full bg-amber-400 transition-all duration-100" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 수배 등급 및 점수 보드 -->
+            <div class="flex flex-col items-end gap-2">
+                <div class="flex items-center gap-2 bg-slate-950/95 border border-slate-800 px-4 py-2 rounded-2xl pointer-events-auto">
+                    <span class="text-xs font-extrabold text-slate-400 mr-1">WANTED:</span>
+                    <div class="flex gap-1" id="starContainer">
+                        <i class="fa-solid fa-star text-slate-600 transition-colors duration-200"></i>
+                        <i class="fa-solid fa-star text-slate-600 transition-colors duration-200"></i>
+                        <i class="fa-solid fa-star text-slate-600 transition-colors duration-200"></i>
+                        <i class="fa-solid fa-star text-slate-600 transition-colors duration-200"></i>
+                        <i class="fa-solid fa-star text-slate-600 transition-colors duration-200"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-950/95 border border-slate-800 px-4 py-2 rounded-xl text-right pointer-events-auto">
+                    <div class="text-[10px] text-slate-400 font-bold">REPUTATION SCORE</div>
+                    <div id="scoreValue" class="text-lg font-black text-amber-500">000,000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 하단 푸터: 무기 정보 및 모바일 컨트롤 -->
+        <div class="flex justify-between items-end w-full">
+            <div class="bg-slate-950/95 border border-slate-800 p-3 rounded-2xl pointer-events-auto flex items-center gap-4 min-w-[200px] shadow-2xl">
+                <div class="flex flex-col">
+                    <div class="text-[10px] text-slate-500 font-bold uppercase" id="weaponType">Primary Weapon</div>
+                    <div class="text-lg font-black text-slate-200 tracking-tight" id="weaponName">Pistol 9mm</div>
+                    <div class="text-sm font-bold text-amber-500" id="ammoText">15 / 15</div>
+                </div>
+                <div class="ml-auto w-16 h-12 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl" id="weaponIcon"></div>
+            </div>
+
+            <div id="toastMessage" class="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-950/95 border border-amber-500/30 px-4 py-2 rounded-xl text-amber-400 font-bold text-xs pointer-events-none opacity-0 transition-opacity duration-300 flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span id="toastText">RELOADING...</span>
+            </div>
+
+            <div class="hidden md:flex flex-col gap-1 bg-slate-950/95 border border-slate-800 p-3 rounded-2xl text-xs text-slate-400 pointer-events-auto">
+                <div class="text-[10px] font-black tracking-wider text-slate-500 mb-1">WEAPON LOADOUT</div>
+                <div class="flex gap-2">
+                    <span id="wd-1" class="px-2 py-1 rounded bg-amber-500/20 text-amber-400 font-extrabold border border-amber-500/30">1: Pistol</span>
+                    <span id="wd-2" class="px-2 py-1 rounded bg-slate-900 text-slate-500 font-semibold border border-transparent">2: SMG</span>
+                    <span id="wd-3" class="px-2 py-1 rounded bg-slate-900 text-slate-500 font-semibold border border-transparent">3: Shotgun</span>
+                    <span id="wd-4" class="px-2 py-1 rounded bg-slate-900 text-slate-500 font-semibold border border-transparent">4: Rifle</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 모바일 전용 조이스틱 영역 및 차량 전용 버튼 -->
+    <div id="mobileControls" class="absolute inset-0 pointer-events-none z-10 hidden">
+        <div id="joystickMoveZone" class="absolute bottom-8 left-8 w-32 h-32 rounded-full bg-slate-950/20 border-2 border-slate-500/20 flex items-center justify-center joystick-zone pointer-events-auto">
+            <div id="joystickMoveStick" class="w-12 h-12 rounded-full bg-slate-100/30 border border-white/50 shadow-lg transform transition-transform duration-75"></div>
+        </div>
+        
+        <!-- 모바일 탑승 버튼 -->
+        <button id="mobileHijackBtn" class="absolute bottom-40 right-8 w-14 h-14 bg-amber-500 hover:bg-amber-400 border border-amber-300 rounded-full flex items-center justify-center text-slate-950 font-black shadow-lg pointer-events-auto transition-all active:scale-95 hidden">
+            <i class="fa-solid fa-car text-xl"></i>
+        </button>
+
+        <div id="joystickShootZone" class="absolute bottom-8 right-8 w-32 h-32 rounded-full bg-slate-950/20 border-2 border-slate-500/20 flex items-center justify-center joystick-zone pointer-events-auto">
+            <div id="joystickShootStick" class="w-12 h-12 rounded-full bg-amber-500/50 border border-amber-300/80 shadow-lg transform transition-transform duration-75"></div>
+        </div>
+    </div>
+
+    <!-- 사망 및 리스폰 오버레이 -->
+    <div id="gameOverScreen" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-red-950/95 text-white transition-opacity duration-300 hidden px-6 text-center">
+        <div class="max-w-md w-full bg-slate-900 border border-red-500/40 rounded-2xl p-8 shadow-2xl space-y-6">
+            <div class="space-y-2">
+                <div class="w-16 h-16 bg-red-500/10 text-red-500 border border-red-500/30 rounded-full flex items-center justify-center mx-auto text-2xl mb-2">
+                    <i class="fa-solid fa-skull-crossbones"></i>
+                </div>
+                <h1 class="text-4xl font-black tracking-tight text-red-500">WASTED</h1>
+                <p class="text-sm text-slate-400">당신은 제압당했습니다. 규칙을 배우고 난폭 범죄자로 재도전하십시오.</p>
+            </div>
+
+            <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 text-left space-y-2 text-xs">
+                <div class="flex justify-between text-slate-400">
+                    <span>최종 수배 지수:</span>
+                    <span id="endStars" class="text-amber-500 font-bold">3 Stars</span>
+                </div>
+                <div class="flex justify-between text-slate-400">
+                    <span>생존 시간:</span>
+                    <span id="endSurvival" class="text-white font-semibold">00:45</span>
+                </div>
+                <div class="flex justify-between text-slate-400">
+                    <span>진압된 전술 경찰 수:</span>
+                    <span id="endKills" class="text-red-400 font-bold">0명</span>
+                </div>
+                <div class="flex justify-between text-slate-400 border-t border-slate-800 pt-2 font-bold">
+                    <span class="text-amber-500">최종 스코어:</span>
+                    <span id="endScore" class="text-amber-500 text-sm">000,000</span>
+                </div>
+            </div>
+
+            <button id="restartGameBtn" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl shadow-lg transition duration-200 transform active:scale-98">
+                새로운 인생으로 재도전
+            </button>
+        </div>
+    </div>
+
+    <!-- 게임 화면 캔버스 -->
+    <canvas id="gameCanvas" class="w-full h-full block bg-slate-900"></canvas>
+
+    <script>
+        // 오디오 신디사이저 엔진
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playShoot(type) {
+                this.init();
+                const ctx = this.ctx;
+                const bufferSize = ctx.sampleRate * 0.15;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                const gain = ctx.createGain();
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+
+                let duration = 0.1;
+                let volume = 0.4;
+
+                if (type === 'Pistol') {
+                    filter.frequency.setValueAtTime(800, ctx.currentTime);
+                    filter.Q.setValueAtTime(2, ctx.currentTime);
+                    duration = 0.12;
+                    volume = 0.45;
+                } else if (type === 'SMG') {
+                    filter.frequency.setValueAtTime(1000, ctx.currentTime);
+                    filter.Q.setValueAtTime(3, ctx.currentTime);
+                    duration = 0.08;
+                    volume = 0.35;
+                } else if (type === 'Shotgun') {
+                    filter.frequency.setValueAtTime(400, ctx.currentTime);
+                    filter.Q.setValueAtTime(1.5, ctx.currentTime);
+                    duration = 0.25;
+                    volume = 0.7;
+                    this.playBoom(100, 0.2);
+                } else if (type === 'Rifle') {
+                    filter.frequency.setValueAtTime(1200, ctx.currentTime);
+                    filter.Q.setValueAtTime(4, ctx.currentTime);
+                    duration = 0.15;
+                    volume = 0.5;
+                    this.playBoom(250, 0.15);
+                }
+
+                gain.gain.setValueAtTime(volume, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+
+                noise.start();
+                noise.stop(ctx.currentTime + duration);
+            },
+            playBoom(frequency, duration) {
+                this.init();
+                const ctx = this.ctx;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, ctx.currentTime + duration);
+                gain.gain.setValueAtTime(0.5, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            },
+            playCrash() {
+                this.init();
+                const ctx = this.ctx;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(30, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.6, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.3);
+            },
+            playReload() {
+                this.init();
+                const ctx = this.ctx;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.setValueAtTime(1500, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.3);
+            },
+            playHurt() {
+                this.init();
+                const ctx = this.ctx;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            },
+            playSiren(freq1, freq2) {
+                this.init();
+                const ctx = this.ctx;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                
+                const now = ctx.currentTime;
+                osc.frequency.setValueAtTime(freq1, now);
+                osc.frequency.linearRampToValueAtTime(freq2, now + 0.4);
+                osc.frequency.linearRampToValueAtTime(freq1, now + 0.8);
+                
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0.05, now + 0.7);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+                
+                osc.start();
+                osc.stop(now + 0.8);
+            }
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const STATE = {
+            menu: true,
+            running: false,
+            gameOver: false,
+            score: 0,
+            startTime: 0,
+            eliminatedPolice: 0,
+            screenShake: 0,
+            wantedLevel: 0,
+            civilianAlertMeter: 0,
+            lastSirenPlay: 0
+        };
+
+        const WEAPONS = {
+            Pistol: {
+                name: "Beretta 92FS",
+                type: "Pistol",
+                fireRate: 350,
+                damage: 25,
+                magSize: 15,
+                ammo: 15,
+                reloadTime: 1200,
+                spread: 0.05,
+                bulletCount: 1,
+                velocity: 18,
+                shakeIntensity: 4,
+                icon: '<i class="fa-solid fa-gun text-amber-500"></i>'
+            },
+            SMG: {
+                name: "MP5 Tactical",
+                type: "SMG",
+                fireRate: 110,
+                damage: 18,
+                magSize: 30,
+                ammo: 30,
+                reloadTime: 1800,
+                spread: 0.14,
+                bulletCount: 1,
+                velocity: 20,
+                shakeIntensity: 3,
+                icon: '<i class="fa-solid fa-person-rifle text-amber-500"></i>'
+            },
+            Shotgun: {
+                name: "Remington 870",
+                type: "Shotgun",
+                fireRate: 850,
+                damage: 15,
+                magSize: 6,
+                ammo: 6,
+                reloadTime: 2500,
+                spread: 0.35,
+                bulletCount: 7,
+                velocity: 15,
+                shakeIntensity: 12,
+                icon: '<i class="fa-solid fa-shield-halved text-amber-500"></i>'
+            },
+            Rifle: {
+                name: "M4A1 Carbine",
+                type: "Rifle",
+                fireRate: 180,
+                damage: 35,
+                magSize: 30,
+                ammo: 30,
+                reloadTime: 2200,
+                spread: 0.07,
+                bulletCount: 1,
+                velocity: 24,
+                shakeIntensity: 6,
+                icon: '<i class="fa-solid fa-crosshairs text-amber-500"></i>'
+            }
+        };
+
+        const player = {
+            id: 'player_char',
+            x: 1000,
+            y: 1000,
+            vx: 0,
+            vy: 0,
+            radius: 16,
+            angle: 0,
+            speed: 3.5,
+            sprintSpeed: 5.5,
+            health: 100,
+            maxHealth: 100,
+            stamina: 100,
+            maxStamina: 100,
+            currentWeaponKey: 'Pistol',
+            lastShotTime: 0,
+            reloading: false,
+            reloadEndTime: 0,
+            isMoving: false,
+            moveCycle: 0,
+            isSprinting: false,
+            drivingCar: null
+        };
+
+        const MAP_SIZE = 3000;
+        const ROAD_COORDS = [300, 900, 1500, 2100, 2700]; 
+        const ROAD_WIDTH = 120;
+        const LANE_OFFSET = 24; 
+
+        const buildings = [];
+        const streetLights = [];
+        const intersections = {};
+
+        ROAD_COORDS.forEach(x => {
+            ROAD_COORDS.forEach(y => {
+                intersections[`${x},${y}`] = {
+                    x: x,
+                    y: y,
+                    state: Math.random() > 0.5 ? 'NS' : 'EW', 
+                    timer: Math.random() * 300 + 150
+                };
+            });
+        });
+        
+        let bullets = [];
+        let particles = [];
+        let enemies = []; 
+        let civilians = []; 
+        let vehicles = [];
+
+        const input = {
+            keys: {},
+            mouseX: 0,
+            mouseY: 0,
+            isMouseDown: false,
+            mobile: false,
+            touchStartX: 0,
+            touchStartY: 0,
+            moveDir: { x: 0, y: 0 },
+            shootDir: { x: 0, y: 0 },
+            isShootingMobile: false
+        };
+
+        function generateWorld() {
+            buildings.length = 0;
+            streetLights.length = 0;
+
+            for (let i = 0; i < ROAD_COORDS.length - 1; i++) {
+                for (let j = 0; j < ROAD_COORDS.length - 1; j++) {
+                    const blockLeft = ROAD_COORDS[i] + ROAD_WIDTH/2 + 25;
+                    const blockRight = ROAD_COORDS[i+1] - ROAD_WIDTH/2 - 25;
+                    const blockTop = ROAD_COORDS[j] + ROAD_WIDTH/2 + 25;
+                    const blockBottom = ROAD_COORDS[j+1] - ROAD_WIDTH/2 - 25;
+
+                    const width = blockRight - blockLeft;
+                    const height = blockBottom - blockTop;
+
+                    buildings.push({
+                        x: blockLeft,
+                        y: blockTop,
+                        w: width,
+                        h: height,
+                        color: ['#1e293b', '#0f172a', '#334155'][Math.floor(Math.random() * 3)],
+                        shadowColor: 'rgba(0, 0, 0, 0.45)'
+                    });
+                }
+            }
+
+            ROAD_COORDS.forEach(x => {
+                ROAD_COORDS.forEach(y => {
+                    streetLights.push({ x: x - ROAD_WIDTH/2 - 10, y: y - ROAD_WIDTH/2 - 10 });
+                    streetLights.push({ x: x + ROAD_WIDTH/2 + 10, y: y + ROAD_WIDTH/2 + 10 });
+                });
+            });
+
+            civilians.length = 0;
+            for (let i = 0; i < 50; i++) {
+                spawnCivilianOnSidewalk();
+            }
+
+            vehicles.length = 0;
+            for (let i = 0; i < 22; i++) {
+                spawnTrafficCar();
+            }
+
+            enemies.length = 0;
+        }
+
+        function spawnTrafficCar() {
+            const isHorizontal = Math.random() > 0.5;
+            const roadCoord = ROAD_COORDS[Math.floor(Math.random() * ROAD_COORDS.length)];
+            const otherCoord = Math.random() * MAP_SIZE;
+            const direction = Math.random() > 0.5 ? 1 : -1;
+
+            let carX = isHorizontal ? otherCoord : roadCoord + (direction * LANE_OFFSET);
+            let carY = isHorizontal ? roadCoord - (direction * LANE_OFFSET) : otherCoord;
+            const angle = isHorizontal ? (direction === 1 ? 0 : Math.PI) : (direction === 1 ? Math.PI/2 : -Math.PI/2);
+
+            vehicles.push({
+                id: 'car_' + Math.random().toString(36).substr(2, 9),
+                x: carX,
+                y: carY,
+                vx: 0,
+                vy: 0,
+                radius: 24, 
+                angle: angle,
+                color: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff', '#64748b'][Math.floor(Math.random() * 8)],
+                driver: 'civilian', 
+                speed: 0,
+                maxSpeed: 4.5,
+                accel: 0.1,
+                friction: 0.95,
+                turnSpeed: 0.05,
+                health: 120,
+                maxHealth: 120,
+                isBraking: false,
+                isBurnt: false,
+                isPolice: false,
+                isHorizontal: isHorizontal,
+                roadCoord: roadCoord,
+                direction: direction,
+                isStoppedForLight: false
+            });
+        }
+
+        function assignNearestBlockBounds(c) {
+            let closestDist = Infinity;
+            let bestBounds = null;
+            for (let i = 0; i < ROAD_COORDS.length - 1; i++) {
+                for (let j = 0; j < ROAD_COORDS.length - 1; j++) {
+                    const xLeft = ROAD_COORDS[i] + ROAD_WIDTH/2 + 5;
+                    const xRight = ROAD_COORDS[i+1] - ROAD_WIDTH/2 - 5;
+                    const yTop = ROAD_COORDS[j] + ROAD_WIDTH/2 + 5;
+                    const yBottom = ROAD_COORDS[j+1] - ROAD_WIDTH/2 - 5;
+                    const centerX = (xLeft + xRight) / 2;
+                    const centerY = (yTop + yBottom) / 2;
+                    const d = Math.hypot(c.x - centerX, c.y - centerY);
+                    if (d < closestDist) {
+                        closestDist = d;
+                        bestBounds = { left: xLeft, right: xRight, top: yTop, bottom: yBottom };
+                    }
+                }
+            }
+            c.blockBounds = bestBounds || { left: 50, right: MAP_SIZE - 50, top: 50, bottom: MAP_SIZE - 50 };
+        }
+
+        function spawnCivilianOnSidewalk() {
+            const blockIdxX = Math.floor(Math.random() * (ROAD_COORDS.length - 1));
+            const blockIdxY = Math.floor(Math.random() * (ROAD_COORDS.length - 1));
+            const xLeft = ROAD_COORDS[blockIdxX] + ROAD_WIDTH/2 + 5;
+            const xRight = ROAD_COORDS[blockIdxX+1] - ROAD_WIDTH/2 - 5;
+            const yTop = ROAD_COORDS[blockIdxY] + ROAD_WIDTH/2 + 5;
+            const yBottom = ROAD_COORDS[blockIdxY+1] - ROAD_WIDTH/2 - 5;
+
+            const cx = Math.random() * (xRight - xLeft) + xLeft;
+            const cy = Math.random() * (yBottom - yTop) + yTop;
+
+            const civ = {
+                x: cx,
+                y: cy,
+                vx: 0,
+                vy: 0,
+                radius: 14,
+                color: `hsl(${Math.random() * 360}, 55%, 50%)`,
+                targetX: cx,
+                targetY: cy,
+                blockBounds: { left: xLeft, right: xRight, top: yTop, bottom: yBottom },
+                state: 'idle',
+                speed: 1.0,
+                panicSpeed: 3.2,
+                panicTimer: 0,
+                angle: Math.random() * Math.PI * 2,
+                moveCycle: Math.random() * 100,
+                clothes: {
+                    shirt: `hsl(${Math.random() * 360}, 50%, 40%)`,
+                    pants: `hsl(${Math.random() * 360}, 30%, 30%)`,
+                    hair: `hsl(${Math.random() * 40 + 20}, 70%, 20%)`
+                }
+            };
+            civilians.push(civ);
+        }
+
+        function spawnPolice() {
+            const roadCoord = ROAD_COORDS[Math.floor(Math.random() * ROAD_COORDS.length)];
+            const otherCoord = Math.random() > 0.5 ? 50 : MAP_SIZE - 50;
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            const isHorizontal = Math.random() > 0.5;
+
+            let carX = isHorizontal ? otherCoord : roadCoord + (direction * LANE_OFFSET);
+            let carY = isHorizontal ? roadCoord - (direction * LANE_OFFSET) : otherCoord;
+            const angle = isHorizontal ? (direction === 1 ? 0 : Math.PI) : (direction === 1 ? Math.PI/2 : -Math.PI/2);
+
+            const isSwat = STATE.wantedLevel >= 3 && Math.random() < 0.6;
+
+            const pCar = {
+                id: 'car_police_' + Math.random().toString(36).substr(2, 9),
+                x: carX,
+                y: carY,
+                vx: 0,
+                vy: 0,
+                radius: 24,
+                angle: angle,
+                color: isSwat ? '#1e293b' : '#020617', 
+                driver: 'police',
+                speed: 0,
+                maxSpeed: isSwat ? 6.5 : 5.5,
+                accel: 0.15,
+                friction: 0.95,
+                turnSpeed: 0.06,
+                health: isSwat ? 180 : 130,
+                maxHealth: isSwat ? 180 : 130,
+                isBraking: false,
+                isBurnt: false,
+                isPolice: true,
+                isSwat: isSwat,
+                isHorizontal: isHorizontal,
+                roadCoord: roadCoord,
+                direction: direction,
+                isStoppedForLight: false
+            };
+            vehicles.push(pCar);
+
+            const spawn = { x: carX, y: carY };
+            enemies.push({
+                x: spawn.x,
+                y: spawn.y,
+                vx: 0,
+                vy: 0,
+                radius: 15,
+                angle: 0,
+                isSwat: isSwat,
+                speed: isSwat ? 2.8 : 2.2,
+                health: isSwat ? 80 : 45,
+                maxHealth: isSwat ? 80 : 45,
+                weapon: isSwat ? WEAPONS.Rifle : WEAPONS.Pistol,
+                ammo: isSwat ? 30 : 15,
+                lastShotTime: 0,
+                targetX: player.x,
+                targetY: player.y,
+                sightRange: 700,
+                moveCycle: Math.random() * 100,
+                sirenOffset: Math.random() * 100,
+                state: 'alert',
+                patrollingCar: pCar
+            });
+        }
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            input.keys[key] = true;
+            
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'w', 'a', 's', 'd'].includes(key)) {
+                e.preventDefault();
+            }
+            
+            if (['1', '2', '3', '4'].includes(e.key)) {
+                switchWeapon(e.key);
+            }
+            if (key === 'r') {
+                reloadWeapon();
+            }
+            if (e.key === 'Enter') {
+                toggleCarDriving();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            input.keys[e.key.toLowerCase()] = false;
+        });
+
+        window.addEventListener('blur', () => {
+            input.keys = {};
+            input.moveDir = { x: 0, y: 0 };
+            input.isMouseDown = false;
+        });
+
+        window.addEventListener('mousedown', () => {
+            window.focus();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!input.mobile) {
+                const cameraX = player.x - canvas.width / 2;
+                const cameraY = player.y - canvas.height / 2;
+                input.mouseX = e.clientX + cameraX;
+                input.mouseY = e.clientY + cameraY;
+            }
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (STATE.menu || STATE.gameOver) return;
+            if (!input.mobile) {
+                input.isMouseDown = true;
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            input.isMouseDown = false;
+        });
+
+        const joystickMoveZone = document.getElementById('joystickMoveZone');
+        const joystickMoveStick = document.getElementById('joystickMoveStick');
+        const joystickShootZone = document.getElementById('joystickShootZone');
+        const joystickShootStick = document.getElementById('joystickShootStick');
+
+        function initMobileControls() {
+            input.mobile = true;
+            document.getElementById('mobileControls').classList.remove('hidden');
+
+            let moveTouchId = null;
+            joystickMoveZone.addEventListener('touchstart', (e) => {
+                const touch = e.changedTouches[0];
+                moveTouchId = touch.identifier;
+                const rect = joystickMoveZone.getBoundingClientRect();
+                input.touchStartX = rect.left + rect.width / 2;
+                input.touchStartY = rect.top + rect.height / 2;
+            }, { passive: true });
+
+            joystickMoveZone.addEventListener('touchmove', (e) => {
+                for (let touch of e.touches) {
+                    if (touch.identifier === moveTouchId) {
+                        const dx = touch.clientX - input.touchStartX;
+                        const dy = touch.clientY - input.touchStartY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = 50;
+                        const angle = Math.atan2(dy, dx);
+                        
+                        const intensity = Math.min(dist, maxDist) / maxDist;
+                        input.moveDir.x = Math.cos(angle) * intensity;
+                        input.moveDir.y = Math.sin(angle) * intensity;
+
+                        const sx = Math.cos(angle) * Math.min(dist, maxDist);
+                        const sy = Math.sin(angle) * Math.min(dist, maxDist);
+                        joystickMoveStick.style.transform = `translate(${sx}px, ${sy}px)`;
+                    }
+                }
+            }, { passive: true });
+
+            const resetMoveStick = () => {
+                moveTouchId = null;
+                input.moveDir.x = 0;
+                input.moveDir.y = 0;
+                joystickMoveStick.style.transform = 'translate(0px, 0px)';
+            };
+            joystickMoveZone.addEventListener('touchend', resetMoveStick);
+            joystickMoveZone.addEventListener('touchcancel', resetMoveStick);
+
+            let shootTouchId = null;
+            joystickShootZone.addEventListener('touchstart', (e) => {
+                const touch = e.changedTouches[0];
+                shootTouchId = touch.identifier;
+                const rect = joystickShootZone.getBoundingClientRect();
+                input.shootStartX = rect.left + rect.width / 2;
+                input.shootStartY = rect.top + rect.height / 2;
+                input.isShootingMobile = true;
+            }, { passive: true });
+
+            joystickShootZone.addEventListener('touchmove', (e) => {
+                for (let touch of e.touches) {
+                    if (touch.identifier === shootTouchId) {
+                        const dx = touch.clientX - input.shootStartX;
+                        const dy = touch.clientY - input.shootStartY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = 50;
+                        const angle = Math.atan2(dy, dx);
+
+                        input.shootDir.x = Math.cos(angle);
+                        input.shootDir.y = Math.sin(angle);
+                        input.isShootingMobile = dist > 15;
+
+                        const sx = Math.cos(angle) * Math.min(dist, maxDist);
+                        const sy = Math.sin(angle) * Math.min(dist, maxDist);
+                        joystickShootStick.style.transform = `translate(${sx}px, ${sy}px)`;
+                    }
+                }
+            }, { passive: true });
+
+            const resetShootStick = () => {
+                shootTouchId = null;
+                input.isShootingMobile = false;
+                joystickShootStick.style.transform = 'translate(0px, 0px)';
+            };
+            joystickShootZone.addEventListener('touchend', resetShootStick);
+            joystickShootZone.addEventListener('touchcancel', resetShootStick);
+        }
+
+        window.addEventListener('touchstart', function once() {
+            initMobileControls();
+            window.removeEventListener('touchstart', once);
+        });
+
+        document.getElementById('mobileHijackBtn').addEventListener('click', () => {
+            toggleCarDriving();
+        });
+
+        function toggleCarDriving() {
+            if (STATE.gameOver || STATE.menu) return;
+
+            if (player.drivingCar) {
+                const car = player.drivingCar;
+                const exitX = car.x + Math.cos(car.angle - Math.PI / 2) * 35;
+                const exitY = car.y + Math.sin(car.angle - Math.PI / 2) * 35;
+                
+                player.x = exitX;
+                player.y = exitY;
+                handleWallCollisions(player);
+
+                player.drivingCar = null;
+                car.driver = null; // 변경: 플레이어가 하차하면 운전자가 없는 빈 차량으로 설정합니다.
+                car.speed = 0;
+                car.vx = 0;
+                car.vy = 0;
+                showToast("차량에서 내렸습니다.");
+                updateHud();
+            } else {
+                let closestCar = null;
+                let minDist = 70; 
+                
+                vehicles.forEach(v => {
+                    if (v.isBurnt) return;
+                    const dist = Math.hypot(v.x - player.x, v.y - player.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestCar = v;
+                    }
+                });
+
+                if (closestCar) {
+                    if (closestCar.driver === 'civilian' || closestCar.driver === 'police') {
+                        const civ = {
+                            x: closestCar.x + Math.cos(closestCar.angle + Math.PI/2) * 25,
+                            y: closestCar.y + Math.sin(closestCar.angle + Math.PI/2) * 25,
+                            vx: (Math.random() - 0.5) * 3,
+                            vy: (Math.random() - 0.5) * 3,
+                            radius: 14,
+                            color: `hsl(${Math.random() * 360}, 55%, 50%)`,
+                            targetX: closestCar.x,
+                            targetY: closestCar.y,
+                            state: 'panicking',
+                            speed: 1.2,
+                            panicSpeed: 3.5,
+                            panicTimer: 240,
+                            angle: closestCar.angle + Math.PI/2,
+                            moveCycle: Math.random() * 100,
+                            clothes: { shirt: '#f43f5e', pants: '#1e293b', hair: '#451a03' }
+                        };
+                        assignNearestBlockBounds(civ);
+                        civilians.push(civ);
+                        showToast("차량을 탈취했습니다!");
+                        STATE.civilianAlertMeter += 0.2; 
+                        if (closestCar.isPolice) {
+                            triggerWantedUpgrade(STATE.wantedLevel + 1);
+                        }
+                    } else {
+                        showToast("버려진 차량에 탑승했습니다.");
+                    }
+                    player.drivingCar = closestCar;
+                    closestCar.driver = 'player';
+                    updateHud();
+                }
+            }
+        }
+
+        function switchWeapon(key) {
+            const map = { '1': 'Pistol', '2': 'SMG', '3': 'Shotgun', '4': 'Rifle' };
+            const selected = map[key];
+            if (selected && !player.reloading) {
+                player.currentWeaponKey = selected;
+                
+                for (let i = 1; i <= 4; i++) {
+                    const el = document.getElementById(`wd-${i}`);
+                    if (el) {
+                        el.className = "px-2 py-1 rounded bg-slate-900 text-slate-500 font-semibold border border-transparent";
+                    }
+                }
+                const activeEl = document.getElementById(`wd-${key}`);
+                if (activeEl) {
+                    activeEl.className = "px-2 py-1 rounded bg-amber-500/20 text-amber-400 font-extrabold border border-amber-500/30";
+                }
+                updateHud();
+            }
+        }
+
+        function reloadWeapon() {
+            const weapon = WEAPONS[player.currentWeaponKey];
+            if (weapon.ammo < weapon.magSize && !player.reloading) {
+                player.reloading = true;
+                player.reloadEndTime = Date.now() + weapon.reloadTime;
+                AudioEngine.playReload();
+                showToast("RELOADING...");
+            }
+        }
+
+        function fireActiveWeapon() {
+            if (player.reloading || player.drivingCar) return;
+
+            const weapon = WEAPONS[player.currentWeaponKey];
+            if (Date.now() - player.lastShotTime > weapon.fireRate) {
+                if (weapon.ammo <= 0) {
+                    reloadWeapon();
+                    return;
+                }
+
+                player.lastShotTime = Date.now();
+                weapon.ammo--;
+                updateHud();
+
+                STATE.screenShake = weapon.shakeIntensity;
+
+                const muzzleX = player.x + Math.cos(player.angle) * 25;
+                const muzzleY = player.y + Math.sin(player.angle) * 25;
+                createMuzzleFlash(muzzleX, muzzleY, player.angle);
+
+                // 탄피 배출
+                createShellEject(muzzleX, muzzleY, player.angle);
+
+                // 산탄 사격 및 단발 물리 격발 분기
+                for (let i = 0; i < weapon.bulletCount; i++) {
+                    const spreadAngle = player.angle + (Math.random() - 0.5) * weapon.spread;
+                    bullets.push({
+                        x: muzzleX,
+                        y: muzzleY,
+                        vx: Math.cos(spreadAngle) * weapon.velocity,
+                        vy: Math.sin(spreadAngle) * weapon.velocity,
+                        damage: weapon.damage,
+                        fromPlayer: true,
+                        range: 550,
+                        traveled: 0
+                    });
+                }
+
+                AudioEngine.playShoot(weapon.type);
+
+                // 총격 소음으로 주변 구역 경계 게이지 격상
+                STATE.civilianAlertMeter += 0.04;
+                civilians.forEach(c => {
+                    const d = Math.hypot(c.x - player.x, c.y - player.y);
+                    if (d < 300) {
+                        c.state = 'panicking';
+                        c.panicTimer = 350;
+                    }
+                });
+            }
+        }
+
+        function createMuzzleFlash(x, y, angle) {
+            particles.push({
+                x, y,
+                vx: Math.cos(angle) * 2,
+                vy: Math.sin(angle) * 2,
+                color: '#fde047',
+                size: Math.random() * 8 + 6,
+                life: 1.0,
+                decay: 0.15,
+                type: 'flash'
+            });
+            for (let i = 0; i < 4; i++) {
+                const spAngle = angle + (Math.random() - 0.5) * 1.2;
+                const speed = Math.random() * 4 + 2;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(spAngle) * speed,
+                    vy: Math.sin(spAngle) * speed,
+                    color: '#f59e0b',
+                    size: Math.random() * 3 + 1,
+                    life: 1.0,
+                    decay: 0.1,
+                    type: 'smoke'
+                });
+            }
+        }
+
+        function createShellEject(x, y, angle) {
+            const sideAngle = angle - Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+            const force = Math.random() * 3 + 2;
+            particles.push({
+                x, y,
+                vx: Math.cos(sideAngle) * force,
+                vy: Math.sin(sideAngle) * force - 1, 
+                color: '#ca8a04', 
+                size: 1.5,
+                length: 4,
+                rotation: Math.random() * Math.PI,
+                rotationSpeed: (Math.random() - 0.5) * 0.4,
+                life: 1.0,
+                decay: 0.015,
+                type: 'shell',
+                grounded: false
+            });
+        }
+
+        function createSpark(x, y, angle) {
+            for (let i = 0; i < 8; i++) {
+                const spAngle = angle + Math.PI + (Math.random() - 0.5) * 1.5;
+                const force = Math.random() * 5 + 2;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(spAngle) * force,
+                    vy: Math.sin(spAngle) * force,
+                    color: '#fef08a',
+                    size: Math.random() * 3 + 1.5,
+                    life: 1.0,
+                    decay: 0.07,
+                    type: 'spark'
+                });
+            }
+        }
+
+        function explodeVehicle(v) {
+            if (v.isBurnt) return;
+            v.isBurnt = true;
+            v.speed = 0;
+            v.vx = 0;
+            v.vy = 0;
+            v.color = '#1e293b'; 
+
+            AudioEngine.playBoom(60, 0.5);
+            STATE.screenShake = 22;
+
+            if (player.drivingCar === v) {
+                player.drivingCar = null;
+                player.health = Math.max(0, player.health - 60);
+                updateHud();
+                if (player.health <= 0) {
+                    triggerGameOver();
+                    return;
+                }
+            }
+
+            for (let i = 0; i < 35; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const force = Math.random() * 10 + 4;
+                particles.push({
+                    x: v.x, y: v.y,
+                    vx: Math.cos(angle) * force,
+                    vy: Math.sin(angle) * force,
+                    color: Math.random() > 0.4 ? '#ef4444' : '#f59e0b',
+                    size: Math.random() * 12 + 6,
+                    life: 1.0,
+                    decay: 0.03,
+                    type: 'fire'
+                });
+            }
+
+            for (let i = 0; i < 20; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const force = Math.random() * 4 + 1;
+                particles.push({
+                    x: v.x + (Math.random() - 0.5) * 20,
+                    y: v.y + (Math.random() - 0.5) * 20,
+                    vx: Math.cos(angle) * force,
+                    vy: Math.sin(angle) * force,
+                    color: '#475569',
+                    size: Math.random() * 18 + 10,
+                    life: 1.0,
+                    decay: 0.02,
+                    type: 'smoke'
+                });
+            }
+
+            // 폭발 범위 대미지 연산
+            enemies.forEach(e => {
+                const dist = Math.hypot(e.x - v.x, e.y - v.y);
+                if (dist < 120) e.health -= 150;
+            });
+            civilians.forEach(c => {
+                const dist = Math.hypot(c.x - v.x, c.y - v.y);
+                if (dist < 120) {
+                    c.state = 'panicking';
+                    c.panicTimer = 200;
+                }
+            });
+        }
+
+        function handleWallCollisions(entity) {
+            const rad = entity.radius;
+            
+            // 맵 경계 제한 조치 (Clamping)
+            if (entity.x < rad) { entity.x = rad; entity.vx = 0; }
+            if (entity.x > MAP_SIZE - rad) { entity.x = MAP_SIZE - rad; entity.vx = 0; }
+            if (entity.y < rad) { entity.y = rad; entity.vy = 0; }
+            if (entity.y > MAP_SIZE - rad) { entity.y = MAP_SIZE - rad; entity.vy = 0; }
+
+            buildings.forEach(b => {
+                if (entity.x + rad > b.x && entity.x - rad < b.x + b.w &&
+                    entity.y + rad > b.y && entity.y - rad < b.y + b.h) {
+                    
+                    const distLeft = (entity.x + rad) - b.x;
+                    const distRight = (b.x + b.w) - (entity.x - rad);
+                    const distTop = (entity.y + rad) - b.y;
+                    const distBottom = (b.y + b.h) - (entity.y - rad);
+
+                    const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+                    if (minDist === distLeft) {
+                        entity.x = b.x - rad;
+                        entity.vx = 0;
+                    } else if (minDist === distRight) {
+                        entity.x = b.x + b.w + rad;
+                        entity.vx = 0;
+                    } else if (minDist === distTop) {
+                        entity.y = b.y - rad;
+                        entity.vy = 0;
+                    } else if (minDist === distBottom) {
+                        entity.y = b.y + b.h + rad;
+                        entity.vy = 0;
+                    }
+                }
+            });
+        }
+
+        function updateIntersectionLights() {
+            for (let key in intersections) {
+                const inter = intersections[key];
+                inter.timer--;
+                if (inter.timer <= 0) {
+                    inter.state = inter.state === 'NS' ? 'EW' : 'NS';
+                    inter.timer = 250 + Math.random() * 200; 
+                }
+            }
+        }
+
+        function updateTrafficAndVehicles() {
+            updateIntersectionLights();
+
+            vehicles.forEach(car => {
+                if (car.isBurnt) return;
+
+                if (car.driver === 'player') {
+                    // 유저 드라이빙 물리
+                    let accelInput = 0;
+                    let steerInput = 0;
+
+                    if (input.mobile) {
+                        accelInput = -input.moveDir.y;
+                        steerInput = input.moveDir.x;
+                    } else {
+                        if (input.keys['w'] || input.keys['arrowup']) accelInput = 1;
+                        if (input.keys['s'] || input.keys['arrowdown']) accelInput = -1;
+                        if (input.keys['a'] || input.keys['arrowleft']) steerInput = -1;
+                        if (input.keys['d'] || input.keys['arrowright']) steerInput = 1;
+                    }
+
+                    if (accelInput !== 0) {
+                        car.speed += accelInput * car.accel;
+                        car.speed = Math.max(-car.maxSpeed * 0.5, Math.min(car.maxSpeed, car.speed));
+                    } else {
+                        car.speed *= car.friction;
+                    }
+
+                    if (Math.abs(car.speed) > 0.5) {
+                        const dir = car.speed > 0 ? 1 : -1;
+                        car.angle += steerInput * car.turnSpeed * dir;
+                    }
+
+                    car.vx = Math.cos(car.angle) * car.speed;
+                    car.vy = Math.sin(car.angle) * car.speed;
+
+                    car.isBraking = accelInput < 0;
+
+                    // 플레이어 탑승 시 연동되는 좌표 동기화
+                    car.x += car.vx;
+                    car.y += car.vy;
+                    player.x = car.x;
+                    player.y = car.y;
+
+                    // 벽 충돌 제동 대미지
+                    const prevVx = car.vx;
+                    const prevVy = car.vy;
+                    handleCarWallCollisions(car);
+                    const speedDiff = Math.hypot(prevVx - car.vx, prevVy - car.vy);
+                    if (speedDiff > 3) {
+                        car.health -= speedDiff * 10;
+                        AudioEngine.playCrash();
+                        STATE.screenShake = speedDiff * 3;
+                        if (car.health <= 0) {
+                            explodeVehicle(car);
+                        }
+                    }
+                    return;
+                }
+
+                // 추가: 운전자(시민/경찰)가 내렸거나 비어 있는 차량은 관성으로 서서히 멈춥니다.
+                if (!car.driver) {
+                    car.speed *= car.friction;
+                    car.vx = Math.cos(car.angle) * car.speed;
+                    car.vy = Math.sin(car.angle) * car.speed;
+                    car.x += car.vx;
+                    car.y += car.vy;
+                    handleCarWallCollisions(car);
+                    return;
+                }
+
+                // AI 정렬 교통 흐름 연산 시작
+                let targetSpeed = car.maxSpeed * 0.7;
+                car.isStoppedForLight = false;
+                car.isBraking = false;
+
+                // 1) 신호등 탐지
+                ROAD_COORDS.forEach(rx => {
+                    ROAD_COORDS.forEach(ry => {
+                        const inter = intersections[`${rx},${ry}`];
+                        if (inter) {
+                            const stopDist = 65;
+                            if (car.isHorizontal) {
+                                const distToIntersection = rx - car.x;
+                                const isFacingInt = car.direction > 0 ? (distToIntersection > 0) : (distToIntersection < 0);
+                                if (isFacingInt && Math.abs(distToIntersection) < stopDist && Math.abs(car.y - ry) < 40) {
+                                    if (inter.state === 'NS') { 
+                                        car.isStoppedForLight = true;
+                                    }
+                                }
+                            } else {
+                                const distToIntersection = ry - car.y;
+                                const isFacingInt = car.direction > 0 ? (distToIntersection > 0) : (distToIntersection < 0);
+                                if (isFacingInt && Math.abs(distToIntersection) < stopDist && Math.abs(car.x - rx) < 40) {
+                                    if (inter.state === 'EW') { 
+                                        car.isStoppedForLight = true;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+
+                // 2) 앞차 탐지 (거리 기반 추종 브레이크 제동 및 줄서기 정렬)
+                vehicles.forEach(other => {
+                    if (other === car || other.isBurnt) return;
+                    const dist = Math.hypot(other.x - car.x, other.y - car.y);
+                    if (dist < 90) {
+                        const relativeAngle = Math.atan2(other.y - car.y, other.x - car.x);
+                        const angleDiff = Math.abs(car.angle - relativeAngle);
+                        if (angleDiff < 0.6) {
+                            targetSpeed = Math.min(targetSpeed, other.speed * 0.8);
+                            car.isBraking = true;
+                        }
+                    }
+                });
+
+                // 경찰차 추격 특화 무시 가동 (수배령 활성화 시 신호등 및 감속 룰 붕괴)
+                if (car.isPolice && STATE.wantedLevel > 0) {
+                    targetSpeed = car.maxSpeed;
+                    car.isStoppedForLight = false;
+                    car.isBraking = false;
+
+                    const chaseAngle = Math.atan2(player.y - car.y, player.x - car.x);
+                    let diff = chaseAngle - car.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    car.angle += Math.sign(diff) * car.turnSpeed;
+                } else {
+                    // 순수 신호 준수 및 차선 각도 자동 복구 정렬
+                    const desiredAngle = car.isHorizontal ? (car.direction === 1 ? 0 : Math.PI) : (car.direction === 1 ? Math.PI/2 : -Math.PI/2);
+                    let diff = desiredAngle - car.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    car.angle += diff * 0.1;
+                }
+
+                if (car.isStoppedForLight) {
+                    targetSpeed = 0;
+                    car.isBraking = true;
+                }
+
+                if (car.speed < targetSpeed) {
+                    car.speed += car.accel;
+                } else {
+                    car.speed -= car.accel * 1.5;
+                }
+
+                car.vx = Math.cos(car.angle) * car.speed;
+                car.vy = Math.sin(car.angle) * car.speed;
+
+                car.x += car.vx;
+                car.y += car.vy;
+
+                // AI 차량 맵 탈출 방지 복귀 유도 처리
+                if (car.x < -100 || car.x > MAP_SIZE + 100 || car.y < -100 || car.y > MAP_SIZE + 100) {
+                    car.x = car.isHorizontal ? (car.direction === 1 ? 50 : MAP_SIZE - 50) : car.roadCoord + (car.direction * LANE_OFFSET);
+                    car.y = car.isHorizontal ? car.roadCoord - (car.direction * LANE_OFFSET) : (car.direction === 1 ? 50 : MAP_SIZE - 50);
+                    car.speed = 0;
+                }
+
+                handleCarWallCollisions(car);
+            });
+        }
+
+        function handleCarWallCollisions(car) {
+            const rad = car.radius;
+            buildings.forEach(b => {
+                if (car.x + rad > b.x && car.x - rad < b.x + b.w &&
+                    car.y + rad > b.y && car.y - rad < b.y + b.h) {
+                    
+                    const distLeft = (car.x + rad) - b.x;
+                    const distRight = (b.x + b.w) - (car.x - rad);
+                    const distTop = (car.y + rad) - b.y;
+                    const distBottom = (b.y + b.h) - (car.y - rad);
+
+                    const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+                    if (minDist === distLeft) {
+                        car.x = b.x - rad;
+                        car.vx = -car.vx * 0.3;
+                    } else if (minDist === distRight) {
+                        car.x = b.x + b.w + rad;
+                        car.vx = -car.vx * 0.3;
+                    } else if (minDist === distTop) {
+                        car.y = b.y - rad;
+                        car.vy = -car.vy * 0.3;
+                    } else if (minDist === distBottom) {
+                        car.y = b.y + b.h + rad;
+                        car.vy = -car.vy * 0.3;
+                    }
+                    car.speed = -car.speed * 0.2;
+                }
+            });
+        }
+
+        function resolveCarCollisions() {
+            for (let i = 0; i < vehicles.length; i++) {
+                for (let j = i + 1; j < vehicles.length; j++) {
+                    const c1 = vehicles[i];
+                    const c2 = vehicles[j];
+
+                    if (c1.isBurnt || c2.isBurnt) continue;
+
+                    const dx = c2.x - c1.x;
+                    const dy = c2.y - c1.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = c1.radius + c2.radius;
+
+                    if (dist < minDist) {
+                        const overlap = minDist - dist;
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+
+                        // 위치 복원 연산 수행 (좌표 보정)
+                        c1.x -= nx * overlap * 0.5;
+                        c1.y -= ny * overlap * 0.5;
+                        c2.x += nx * overlap * 0.5;
+                        c2.y += ny * overlap * 0.5;
+
+                        // 상대 운동량 충격량 계산
+                        const rvx = c2.vx - c1.vx;
+                        const rvy = c2.vy - c1.vy;
+                        const velAlongNormal = rvx * nx + rvy * ny;
+
+                        if (velAlongNormal < 0) {
+                            const restitution = 0.5; 
+                            let impulseScalar = -(1 + restitution) * velAlongNormal;
+                            impulseScalar /= 2; 
+
+                            const ix = nx * impulseScalar;
+                            const iy = ny * impulseScalar;
+
+                            c1.vx -= ix;
+                            c1.vy -= iy;
+                            c2.vx += ix;
+                            c2.vy += iy;
+
+                            c1.speed = Math.sign(c1.speed) * Math.hypot(c1.vx, c1.vy);
+                            c2.speed = Math.sign(c2.speed) * Math.hypot(c2.vx, c2.vy);
+
+                            // 충돌 임팩트 데미지 산출
+                            const crashForce = Math.abs(velAlongNormal);
+                            if (crashForce > 1.5) {
+                                c1.health -= crashForce * 12;
+                                c2.health -= crashForce * 12;
+                                createSpark((c1.x + c2.x)/2, (c1.y + c2.y)/2, Math.atan2(ny, nx));
+                                AudioEngine.playCrash();
+
+                                if (c1.health <= 0) explodeVehicle(c1);
+                                if (c2.health <= 0) explodeVehicle(c2);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 플레이어 보보/차량과 AI 차 간의 뭉개짐(Crush) 피해 여부 연동
+            if (!player.drivingCar) {
+                vehicles.forEach(v => {
+                    if (v.isBurnt) return;
+                    const dist = Math.hypot(player.x - v.x, player.y - v.y);
+                    if (dist < player.radius + v.radius) {
+                        const relativeSpeed = Math.hypot(v.vx, v.vy);
+                        if (relativeSpeed > 1.8) {
+                            player.health -= relativeSpeed * 8;
+                            AudioEngine.playHurt();
+                            STATE.screenShake = 12;
+                            updateHud();
+
+                            // 튕겨내기 물리 적용
+                            const angle = Math.atan2(player.y - v.y, player.x - v.x);
+                            player.x += Math.cos(angle) * 35;
+                            player.y += Math.sin(angle) * 35;
+                            handleWallCollisions(player);
+
+                            if (player.health <= 0) {
+                                triggerGameOver();
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updateGame() {
+            if (!STATE.running) return;
+
+            // 모바일 차량 탑승 버튼 노출 처리
+            const mobileHijackBtn = document.getElementById('mobileHijackBtn');
+            let hasNearbyCar = false;
+            if (input.mobile) {
+                if (player.drivingCar) {
+                    hasNearbyCar = true;
+                } else {
+                    vehicles.forEach(v => {
+                        if (!v.isBurnt && Math.hypot(v.x - player.x, v.y - player.y) < 70) {
+                            hasNearbyCar = true;
+                        }
+                    });
+                }
+            }
+            if (hasNearbyCar && input.mobile) {
+                mobileHijackBtn.classList.remove('hidden');
+            } else {
+                mobileHijackBtn.classList.add('hidden');
+            }
+
+            if (player.reloading && Date.now() >= player.reloadEndTime) {
+                const weapon = WEAPONS[player.currentWeaponKey];
+                weapon.ammo = weapon.magSize;
+                player.reloading = false;
+                updateHud();
+            }
+
+            updateTrafficAndVehicles();
+            resolveCarCollisions();
+
+            if (!player.drivingCar) {
+                let moveX = 0;
+                let moveY = 0;
+
+                if (input.mobile) {
+                    moveX = input.moveDir.x;
+                    moveY = input.moveDir.y;
+                } else {
+                    if (input.keys['w'] || input.keys['arrowup']) moveY = -1;
+                    if (input.keys['s'] || input.keys['arrowdown']) moveY = 1;
+                    if (input.keys['a'] || input.keys['arrowleft']) moveX = -1;
+                    if (input.keys['d'] || input.keys['arrowright']) moveX = 1;
+
+                    if (moveX !== 0 && moveY !== 0) {
+                        const len = Math.hypot(moveX, moveY);
+                        moveX /= len;
+                        moveY /= len;
+                    }
+                }
+
+                const sprintPressed = input.keys['shift'] && !input.mobile;
+                const currentMaxSpeed = (sprintPressed && player.stamina > 10 && (moveX !== 0 || moveY !== 0)) ? player.sprintSpeed : player.speed;
+
+                if (sprintPressed && (moveX !== 0 || moveY !== 0) && player.stamina > 5) {
+                    player.stamina = Math.max(0, player.stamina - 0.4);
+                    player.isSprinting = true;
+                } else {
+                    player.stamina = Math.min(player.maxStamina, player.stamina + 0.2);
+                    player.isSprinting = false;
+                }
+
+                player.vx = moveX * currentMaxSpeed;
+                player.vy = moveY * currentMaxSpeed;
+
+                player.x += player.vx;
+                player.y += player.vy;
+
+                if (Math.hypot(player.vx, player.vy) > 0.5) {
+                    player.isMoving = true;
+                    player.moveCycle += player.isSprinting ? 0.3 : 0.15;
+                } else {
+                    player.isMoving = false;
+                }
+
+                if (!input.mobile) {
+                    player.angle = Math.atan2(input.mouseY - player.y, input.mouseX - player.x);
+                } else if (input.isShootingMobile) {
+                    player.angle = Math.atan2(input.shootDir.y, input.shootDir.x);
+                } else if (Math.hypot(player.vx, player.vy) > 0.1) {
+                    player.angle = Math.atan2(player.vy, player.vx);
+                }
+
+                handleWallCollisions(player);
+
+                if ((input.isMouseDown && !input.mobile) || (input.mobile && input.isShootingMobile)) {
+                    fireActiveWeapon();
+                }
+            }
+
+            bullets = bullets.filter(b => {
+                b.x += b.vx;
+                b.y += b.vy;
+                b.traveled += Math.hypot(b.vx, b.vy);
+
+                if (b.traveled > b.range || b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE) {
+                    return false;
+                }
+
+                for (const build of buildings) {
+                    if (b.x > build.x && b.x < build.x + build.w &&
+                        b.y > build.y && b.y < build.y + build.h) {
+                        createSpark(b.x, b.y, Math.atan2(-b.vy, -b.vx));
+                        return false;
+                    }
+                }
+
+                for (const v of vehicles) {
+                    if (v.isBurnt) continue;
+                    const dist = Math.hypot(b.x - v.x, b.y - v.y);
+                    if (dist < v.radius + 6) {
+                        v.health -= b.damage;
+                        createSpark(b.x, b.y, Math.atan2(b.vy, b.vx));
+
+                        if (v.driver === 'civilian') {
+                            v.driver = null;
+                            const civ = {
+                                x: v.x + Math.cos(v.angle + Math.PI/2) * 25,
+                                y: v.y + Math.sin(v.angle + Math.PI/2) * 25,
+                                vx: (Math.random() - 0.5) * 4,
+                                vy: (Math.random() - 0.5) * 4,
+                                radius: 14,
+                                color: `hsl(${Math.random() * 360}, 55%, 50%)`,
+                                targetX: v.x,
+                                targetY: v.y,
+                                state: 'panicking',
+                                speed: 1.2,
+                                panicSpeed: 3.5,
+                                panicTimer: 300,
+                                angle: v.angle + Math.PI/2,
+                                moveCycle: Math.random() * 100,
+                                clothes: { shirt: '#ef4444', pants: '#1e293b', hair: '#78350f' }
+                            };
+                            assignNearestBlockBounds(civ);
+                            civilians.push(civ);
+                            showToast("시민이 사격에 놀라 차를 탈출했습니다!");
+                        }
+
+                        if (v.health <= 0) {
+                            explodeVehicle(v);
+                        }
+                        return false;
+                    }
+                }
+
+                if (b.fromPlayer) {
+                    for (const enemy of enemies) {
+                        const dist = Math.hypot(b.x - enemy.x, b.y - enemy.y);
+                        if (dist < enemy.radius + 4) {
+                            enemy.health -= b.damage;
+                            createSpark(b.x, b.y, Math.atan2(b.vy, b.vx));
+                            enemy.isHitFlash = 5;
+
+                            if (enemy.health <= 0) {
+                                STATE.score += enemy.isSwat ? 500 : 200;
+                                STATE.eliminatedPolice++;
+                                createDustBlast(enemy.x, enemy.y);
+                                updateHud();
+                            }
+                            return false;
+                        }
+                    }
+
+                    for (let i = civilians.length - 1; i >= 0; i--) {
+                        const civ = civilians[i];
+                        const dist = Math.hypot(b.x - civ.x, b.y - civ.y);
+                        if (dist < civ.radius + 4) {
+                            createSpark(b.x, b.y, Math.atan2(b.vy, b.vx));
+                            createDustBlast(civ.x, civ.y);
+                            civilians.splice(i, 1);
+                            
+                            STATE.civilianAlertMeter += 0.8;
+                            if (STATE.wantedLevel === 0) {
+                                triggerWantedUpgrade(1);
+                            }
+                            
+                            spawnCivilianOnSidewalk();
+                            return false;
+                        }
+                    }
+                } else {
+                    const dist = Math.hypot(b.x - player.x, b.y - player.y);
+                    if (dist < player.radius + 4) {
+                        if (player.drivingCar) {
+                            player.drivingCar.health -= b.damage * 0.7;
+                            createSpark(b.x, b.y, Math.atan2(b.vy, b.vx));
+                        } else {
+                            player.health -= b.damage;
+                            createSpark(b.x, b.y, Math.atan2(b.vy, b.vx));
+                            AudioEngine.playHurt();
+                            STATE.screenShake = 5;
+                            updateHud();
+
+                            if (player.health <= 0) {
+                                triggerGameOver();
+                            }
+                        }
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // 시민 보행 흐름 업데이트
+            civilians.forEach(c => {
+                if (!c.blockBounds) {
+                    assignNearestBlockBounds(c);
+                }
+
+                if (c.state === 'panicking') {
+                    c.panicTimer--;
+                    if (c.panicTimer <= 0) c.state = 'idle';
+                    const runAngle = Math.atan2(c.y - player.y, c.x - player.x) + (Math.random() - 0.5) * 0.5;
+                    c.vx = Math.cos(runAngle) * c.panicSpeed;
+                    c.vy = Math.sin(runAngle) * c.panicSpeed;
+                    c.angle = runAngle;
+                    c.moveCycle += 0.25;
+                } else {
+                    const distToTarget = Math.hypot(c.targetX - c.x, c.targetY - c.y);
+                    if (distToTarget < 20 || Math.random() < 0.005) {
+                        c.targetX = Math.random() * (c.blockBounds.right - c.blockBounds.left) + c.blockBounds.left;
+                        c.targetY = Math.random() * (c.blockBounds.bottom - c.blockBounds.top) + c.blockBounds.top;
+                    }
+                    const walkAngle = Math.atan2(c.targetY - c.y, c.targetX - c.x);
+                    c.vx = Math.cos(walkAngle) * c.speed;
+                    c.vy = Math.sin(walkAngle) * c.speed;
+                    c.angle = walkAngle;
+                    c.moveCycle += 0.08;
+                }
+
+                c.x += c.vx;
+                c.y += c.vy;
+
+                if (c.state !== 'panicking') {
+                    if (c.x < c.blockBounds.left) c.x = c.blockBounds.left;
+                    if (c.x > c.blockBounds.right) c.x = c.blockBounds.right;
+                    if (c.y < c.blockBounds.top) c.y = c.blockBounds.top;
+                    if (c.y > c.blockBounds.bottom) c.y = c.blockBounds.bottom;
+                } else {
+                    handleWallCollisions(c);
+                }
+            });
+
+            if (STATE.civilianAlertMeter >= 1.0) {
+                STATE.civilianAlertMeter = 0;
+                triggerWantedUpgrade(STATE.wantedLevel + 1);
+            }
+
+            if (STATE.wantedLevel > 0) {
+                const maxCopCount = STATE.wantedLevel * 3 + 2;
+                if (enemies.length < maxCopCount && Math.random() < 0.015) {
+                    spawnPolice();
+                }
+
+                if (Date.now() - STATE.lastSirenPlay > 2000) {
+                    AudioEngine.playSiren(700, 1100);
+                    STATE.lastSirenPlay = Date.now();
+                }
+            }
+
+            enemies = enemies.filter(enemy => {
+                if (enemy.health <= 0) {
+                    if (enemy.patrollingCar && !enemy.patrollingCar.isBurnt) {
+                        enemy.patrollingCar.driver = null; 
+                    }
+                    return false;
+                }
+
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distToPlayer = Math.hypot(dx, dy);
+
+                enemy.angle = Math.atan2(dy, dx);
+
+                if (enemy.isHitFlash > 0) enemy.isHitFlash--;
+
+                if (distToPlayer < enemy.sightRange) {
+                    if (distToPlayer > 180) {
+                        enemy.vx = Math.cos(enemy.angle) * enemy.speed;
+                        enemy.vy = Math.sin(enemy.angle) * enemy.speed;
+                        enemy.moveCycle += 0.15;
+                    } else {
+                        enemy.vx *= 0.8;
+                        enemy.vy *= 0.8;
+                    }
+
+                    const shotInterval = enemy.isSwat ? 450 : 900;
+                    if (Date.now() - enemy.lastShotTime > shotInterval + Math.random() * 300) {
+                        enemy.lastShotTime = Date.now();
+                        
+                        const fX = enemy.x + Math.cos(enemy.angle) * 22;
+                        const fY = enemy.y + Math.sin(enemy.angle) * 22;
+                        createMuzzleFlash(fX, fY, enemy.angle);
+
+                        const spread = enemy.isSwat ? 0.08 : 0.18;
+                        const spAngle = enemy.angle + (Math.random() - 0.5) * spread;
+                        bullets.push({
+                            x: fX,
+                            y: fY,
+                            vx: Math.cos(spAngle) * 11,
+                            vy: Math.sin(spAngle) * 11,
+                            damage: enemy.isSwat ? 10 : 6,
+                            fromPlayer: false,
+                            range: 650,
+                            traveled: 0
+                        });
+                        AudioEngine.playShoot(enemy.isSwat ? 'Rifle' : 'Pistol');
+                    }
+                } else {
+                    const wanderDx = enemy.targetX - enemy.x;
+                    const wanderDy = enemy.targetY - enemy.y;
+                    if (Math.hypot(wanderDx, wanderDy) < 50 || Math.random() < 0.005) {
+                        enemy.targetX = player.x + (Math.random() - 0.5) * 400;
+                        enemy.targetY = player.y + (Math.random() - 0.5) * 400;
+                    }
+                    const moveAngle = Math.atan2(wanderDy, wanderDx);
+                    enemy.vx = Math.cos(moveAngle) * (enemy.speed * 0.7);
+                    enemy.vy = Math.sin(moveAngle) * (enemy.speed * 0.7);
+                    enemy.angle = moveAngle;
+                }
+
+                enemy.x += enemy.vx;
+                enemy.y += enemy.vy;
+                handleWallCollisions(enemy);
+
+                return true;
+            });
+
+            particles = particles.filter(p => {
+                p.life -= p.decay;
+                if (p.life <= 0) return false;
+
+                if (p.type === 'shell') {
+                    if (!p.grounded) {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.15;
+                        p.rotation += p.rotationSpeed;
+                        if (Math.random() < 0.1) {
+                            p.grounded = true;
+                            p.vx = 0;
+                            p.vy = 0;
+                        }
+                    }
+                } else {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vx *= 0.95;
+                    p.vy *= 0.95;
+                }
+
+                return true;
+            });
+        }
+
+        function createDustBlast(x, y) {
+            for (let i = 0; i < 12; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const force = Math.random() * 3 + 1;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * force,
+                    vy: Math.sin(angle) * force,
+                    color: 'rgba(226, 232, 240, 0.45)',
+                    size: Math.random() * 14 + 6,
+                    life: 1,
+                    decay: 0.03,
+                    type: 'smoke'
+                });
+            }
+        }
+
+        function triggerWantedUpgrade(level) {
+            const nextLevel = Math.min(5, level);
+            if (STATE.wantedLevel !== nextLevel) {
+                STATE.wantedLevel = nextLevel;
+                showToast(`WANTED LEVEL INCREASED: ${"★".repeat(STATE.wantedLevel)}`);
+                updateHud();
+            }
+        }
+
+        function drawGame() {
+            let cameraX = player.x - canvas.width / 2;
+            let cameraY = player.y - canvas.height / 2;
+
+            if (STATE.screenShake > 0) {
+                cameraX += (Math.random() - 0.5) * STATE.screenShake;
+                cameraY += (Math.random() - 0.5) * STATE.screenShake;
+                STATE.screenShake = Math.max(0, STATE.screenShake - 0.4);
+            }
+
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-cameraX, -cameraY);
+
+            drawCityGrid();
+
+            particles.forEach(p => {
+                if (p.type === 'shell') {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rotation);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.fillRect(-p.size/2, -p.length/2, p.size, p.length);
+                    ctx.restore();
+                }
+            });
+
+            vehicles.forEach(car => drawCar(car));
+
+            civilians.forEach(c => drawHumanSprite(c));
+            enemies.forEach(cop => drawHumanSprite(cop));
+
+            if (!player.drivingCar) {
+                drawHumanSprite(player, true);
+
+                let closestCar = null;
+                let minDist = 70;
+                vehicles.forEach(v => {
+                    if (v.isBurnt) return;
+                    const dist = Math.hypot(v.x - player.x, v.y - player.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestCar = v;
+                    }
+                });
+
+                if (closestCar) {
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.font = 'bold 12px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText('[ENTER] 키를 눌러 탑승', player.x, player.y - 32);
+                    ctx.shadowBlur = 0; 
+                }
+            }
+
+            bullets.forEach(b => {
+                ctx.save();
+                ctx.strokeStyle = b.fromPlayer ? '#fbbf24' : '#f87171';
+                ctx.lineWidth = 3;
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(b.x, b.y);
+                ctx.lineTo(b.x - b.vx * 1.5, b.y - b.vy * 1.5);
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            particles.forEach(p => {
+                if (p.type !== 'shell') {
+                    ctx.save();
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            drawBuildings(cameraX, cameraY);
+            drawIntersectionTrafficLights();
+
+            ctx.restore();
+        }
+
+        function drawCityGrid() {
+            ctx.fillStyle = '#1e293b'; 
+            ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+            ctx.fillStyle = '#0f172a'; 
+            ROAD_COORDS.forEach(coord => {
+                ctx.fillRect(0, coord - ROAD_WIDTH/2, MAP_SIZE, ROAD_WIDTH);
+                ctx.fillRect(coord - ROAD_WIDTH/2, 0, ROAD_WIDTH, MAP_SIZE);
+            });
+
+            ROAD_COORDS.forEach(coord => {
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, coord);
+                ctx.lineTo(MAP_SIZE, coord);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([15, 15]);
+                ctx.beginPath();
+                ctx.moveTo(0, coord - ROAD_WIDTH/4);
+                ctx.lineTo(MAP_SIZE, coord - ROAD_WIDTH/4);
+                ctx.moveTo(0, coord + ROAD_WIDTH/4);
+                ctx.lineTo(MAP_SIZE, coord + ROAD_WIDTH/4);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(coord, 0);
+                ctx.lineTo(coord, MAP_SIZE);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([15, 15]);
+                ctx.beginPath();
+                ctx.moveTo(coord - ROAD_WIDTH/4, 0);
+                ctx.lineTo(coord - ROAD_WIDTH/4, MAP_SIZE);
+                ctx.moveTo(coord + ROAD_WIDTH/4, 0);
+                ctx.lineTo(coord + ROAD_WIDTH/4, MAP_SIZE);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+
+            ROAD_COORDS.forEach(rx => {
+                ROAD_COORDS.forEach(ry => {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+                    
+                    for (let i = 0; i < 5; i++) {
+                        ctx.fillRect(rx - ROAD_WIDTH/2 + 5 + (i * 22), ry - ROAD_WIDTH/2 - 25, 12, 18);
+                        ctx.fillRect(rx - ROAD_WIDTH/2 + 5 + (i * 22), ry + ROAD_WIDTH/2 + 7, 12, 18);
+                    }
+
+                    for (let i = 0; i < 5; i++) {
+                        ctx.fillRect(rx - ROAD_WIDTH/2 - 25, ry - ROAD_WIDTH/2 + 5 + (i * 22), 18, 12);
+                        ctx.fillRect(rx + ROAD_WIDTH/2 + 7, ry - ROAD_WIDTH/2 + 5 + (i * 22), 18, 12);
+                    }
+                });
+            });
+        }
+
+        function drawIntersectionTrafficLights() {
+            for (let key in intersections) {
+                const inter = intersections[key];
+
+                const offset = ROAD_WIDTH/2 + 15;
+                const posts = [
+                    { x: inter.x - offset, y: inter.y - offset },
+                    { x: inter.x + offset, y: inter.y - offset },
+                    { x: inter.x - offset, y: inter.y + offset },
+                    { x: inter.x + offset, y: inter.y + offset }
+                ];
+
+                posts.forEach((p, idx) => {
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(p.x - 4, p.y - 12, 8, 24);
+
+                    const isNSGreen = inter.state === 'NS';
+                    let isGreenForThisDir = false;
+
+                    if (idx === 0 || idx === 3) {
+                        isGreenForThisDir = isNSGreen;
+                    } else {
+                        isGreenForThisDir = !isNSGreen;
+                    }
+
+                    ctx.fillStyle = isGreenForThisDir ? '#10b981' : '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(p.x, isGreenForThisDir ? p.y + 6 : p.y - 6, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    const grad = ctx.createRadialGradient(p.x, isGreenForThisDir ? p.y + 6 : p.y - 6, 1, p.x, isGreenForThisDir ? p.y + 6 : p.y - 6, 12);
+                    grad.addColorStop(0, isGreenForThisDir ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)');
+                    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(p.x, isGreenForThisDir ? p.y + 6 : p.y - 6, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+        }
+
+        function drawCar(car) {
+            ctx.save();
+            ctx.translate(car.x, car.y);
+            ctx.rotate(car.angle);
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+            ctx.beginPath();
+            ctx.roundRect(-24, -13, 52, 26, 6);
+            ctx.fill();
+
+            ctx.fillStyle = car.color;
+            ctx.beginPath();
+            ctx.roundRect(-22, -12, 44, 24, 6);
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#0f172a';
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+            ctx.fillRect(-6, -9, 14, 18);
+            
+            ctx.fillStyle = 'rgba(147, 197, 253, 0.5)';
+            ctx.fillRect(4, -8, 3, 16);
+            ctx.fillRect(-10, -8, 3, 16);
+
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(20, -9, 3, 4);
+            ctx.fillRect(20, 5, 3, 4);
+
+            ctx.fillStyle = car.isBraking ? '#ef4444' : '#b91c1c';
+            ctx.fillRect(-23, -9, 2, 3);
+            ctx.fillRect(-23, 6, 2, 3);
+
+            if (car.isPolice && !car.isBurnt) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 7px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(car.isSwat ? 'SWAT' : 'PD', -1, 3);
+
+                const flash = Math.floor(Date.now() / 150) % 2 === 0;
+                ctx.fillStyle = flash ? '#3b82f6' : '#ef4444';
+                ctx.beginPath();
+                ctx.arc(0, 0, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (car.isBurnt) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(-15, -8, 30, 16);
+            }
+
+            ctx.restore();
+        }
+
+        function drawBuildings(cameraX, cameraY) {
+            buildings.forEach(b => {
+                const sX = -45;
+                const sY = -45;
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(b.x, b.y);
+                ctx.lineTo(b.x + sX, b.y + sY);
+                ctx.lineTo(b.x + b.w + sX, b.y + sY);
+                ctx.lineTo(b.x + b.w, b.y);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(b.x + b.w, b.y);
+                ctx.lineTo(b.x + b.w + sX, b.y + sY);
+                ctx.lineTo(b.x + b.w + sX, b.y + b.h + sY);
+                ctx.lineTo(b.x + b.w, b.y + b.h);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(b.x, b.y + b.h);
+                ctx.lineTo(b.x + sX, b.y + b.h + sY);
+                ctx.lineTo(b.x + b.w + sX, b.y + b.h + sY);
+                ctx.lineTo(b.x + b.w, b.y + b.h);
+                ctx.fill();
+                ctx.restore();
+
+                ctx.fillStyle = b.color;
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#475569';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+                ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                ctx.fillRect(b.x + 15, b.y + 15, b.w - 30, b.h - 30);
+                
+                if (b.w > 120 && b.h > 120) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(b.x + b.w/2 - 20, b.y + b.h/2 - 20, 40, 40);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.font = 'bold 20px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('H', b.x + b.w/2, b.y + b.h/2);
+                }
+            });
+        }
+
+        function drawHumanSprite(char, isPlayer = false) {
+            ctx.save();
+            ctx.translate(char.x, char.y);
+            ctx.rotate(char.angle);
+
+            if (char.isHitFlash > 0) {
+                ctx.filter = 'brightness(3)';
+            }
+
+            const walkFactor = char.isMoving ? Math.sin(char.moveCycle) * 8 : 0;
+
+            ctx.fillStyle = char.clothes?.pants || '#1e3a8a';
+            ctx.fillRect(-8, -12 + walkFactor, 6, 8);
+            ctx.fillRect(-8, 4 - walkFactor, 6, 8);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.arc(2, 2, char.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = char.clothes?.shirt || '#475569';
+            if (isPlayer) {
+                ctx.fillStyle = '#0f172a';
+            } else if (char.isSwat) {
+                ctx.fillStyle = '#0f172a';
+            } else if (char.health && !isPlayer) {
+                ctx.fillStyle = '#1e3a8a';
+            }
+
+            ctx.beginPath();
+            ctx.arc(0, 0, char.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (char.isSwat || isPlayer) {
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(-6, -10, 10, 20);
+            }
+
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(-2, 0, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (isPlayer) {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(1, -5, 3, 3);
+                ctx.fillRect(1, 2, 3, 3);
+            } else if (char.health && !isPlayer) {
+                ctx.fillStyle = char.isSwat ? '#1e293b' : '#1e3a8a';
+                ctx.fillRect(-1, -7, 6, 14);
+                ctx.fillStyle = '#fbbf24';
+                ctx.fillRect(4, -1, 2, 2);
+            }
+
+            ctx.fillStyle = '#f59e0b';
+            const gunType = isPlayer ? player.currentWeaponKey : (char.isSwat ? 'Rifle' : 'Pistol');
+
+            if (gunType === 'Pistol') {
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(10, -2, 12, 4);
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(10, 0, 3, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(8, -4, 20, 5);
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(5, -3, 6, 6);
+
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(12, -4, 3, 0, Math.PI * 2);
+                ctx.arc(20, -2, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (char.health && !isPlayer) {
+                const clock = (Date.now() / 150) + char.sirenOffset;
+                const flashLeft = Math.floor(clock) % 2 === 0;
+                
+                ctx.fillStyle = flashLeft ? 'rgba(59, 130, 246, 0.95)' : 'rgba(239, 68, 68, 0.95)';
+                ctx.beginPath();
+                ctx.arc(-2, flashLeft ? -9 : 9, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const grad = ctx.createRadialGradient(-2, flashLeft ? -9 : 9, 2, -2, flashLeft ? -9 : 9, 60);
+                grad.addColorStop(0, flashLeft ? 'rgba(59, 130, 246, 0.6)' : 'rgba(239, 68, 68, 0.6)');
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(-2, flashLeft ? -9 : 9, 60, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        function updateHud() {
+            document.getElementById('healthText').innerText = `${Math.ceil(player.health)} / ${player.maxHealth}`;
+            document.getElementById('healthBar').style.width = `${Math.max(0, player.health)}%`;
+            document.getElementById('staminaBar').style.width = `${player.stamina}%`;
+            document.getElementById('scoreValue').innerText = String(STATE.score).padStart(6, '0');
+
+            const stars = document.getElementById('starContainer').children;
+            for (let i = 0; i < 5; i++) {
+                if (i < STATE.wantedLevel) {
+                    stars[i].className = "fa-solid fa-star text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]";
+                } else {
+                    stars[i].className = "fa-solid fa-star text-slate-700";
+                }
+            }
+
+            const weapon = WEAPONS[player.currentWeaponKey];
+            document.getElementById('weaponName').innerText = weapon.name;
+            document.getElementById('weaponType').innerText = weapon.type;
+            document.getElementById('ammoText').innerText = `${weapon.ammo} / ${weapon.magSize}`;
+            document.getElementById('weaponIcon').innerHTML = weapon.icon;
+        }
+
+        function showToast(msg) {
+            const el = document.getElementById('toastMessage');
+            document.getElementById('toastText').innerText = msg.toUpperCase();
+            el.className = "absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-950/95 border border-amber-500/80 px-4 py-2 rounded-xl text-amber-400 font-bold text-xs pointer-events-none opacity-100 transition-opacity duration-200 flex items-center gap-2";
+            
+            setTimeout(() => {
+                el.className = "absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-950/95 border border-amber-500/30 px-4 py-2 rounded-xl text-amber-400 font-bold text-xs pointer-events-none opacity-0 transition-opacity duration-300 flex items-center gap-2";
+            }, 1500);
+        }
+
+        function triggerGameOver() {
+            STATE.running = false;
+            STATE.gameOver = true;
+            
+            document.getElementById('endStars').innerText = "★".repeat(STATE.wantedLevel) || "0 Star";
+            const survivalSec = Math.floor((Date.now() - STATE.startTime) / 1000);
+            const m = String(Math.floor(survivalSec / 60)).padStart(2, '0');
+            const s = String(survivalSec % 60).padStart(2, '0');
+            document.getElementById('endSurvival').innerText = `${m}:${s}`;
+            document.getElementById('endKills').innerText = `${STATE.eliminatedPolice}명`;
+            document.getElementById('endScore').innerText = String(STATE.score).padStart(6, '0');
+
+            document.getElementById('gameHud').classList.add('opacity-0');
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function startNewSession() {
+            STATE.score = 0;
+            STATE.wantedLevel = 0;
+            STATE.civilianAlertMeter = 0;
+            STATE.eliminatedPolice = 0;
+            STATE.startTime = Date.now();
+            STATE.gameOver = false;
+            STATE.menu = false;
+            STATE.running = true;
+
+            input.keys = {};
+            input.moveDir = { x: 0, y: 0 };
+            input.shootDir = { x: 0, y: 0 };
+            input.isMouseDown = false;
+            input.isShootingMobile = false;
+
+            if (document.activeElement) {
+                document.activeElement.blur();
+            }
+            window.focus();
+
+            player.health = 100;
+            player.stamina = 100;
+            player.currentWeaponKey = 'Pistol';
+            player.x = 1000;
+            player.y = 1000;
+            player.vx = 0;
+            player.vy = 0;
+            player.drivingCar = null;
+
+            Object.keys(WEAPONS).forEach(k => {
+                WEAPONS[k].ammo = WEAPONS[k].magSize;
+            });
+
+            generateWorld();
+            updateHud();
+
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('gameHud').classList.remove('opacity-0');
+        }
+
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            AudioEngine.init();
+            startNewSession();
+        });
+
+        document.getElementById('restartGameBtn').addEventListener('click', () => {
+            startNewSession();
+        });
+
+        window.onload = function() {
+            generateWorld();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>

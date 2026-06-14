@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 게임 놀이터</title>
+    <style>
+        body {
+            background-color: #1a1a2e;
+            font-family: sans-serif;
+            text-align: center;
+            color: white;
+            padding: 40px;
+        }
+        h1 {
+            font-size: 40px;
+        }
+        .games {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 40px;
+        }
+        .game-card {
+            background-color: #16213e;
+            border: 2px solid #0f3460;
+            border-radius: 20px;
+            padding: 30px;
+            width: 200px;
+            text-decoration: none;
+            color: white;
+            transition: transform 0.2s;
+        }
+        .game-card:hover {
+            transform: scale(1.1);
+            border-color: #e94560;
+        }
+        .emoji {
+            font-size: 60px;
+        }
+        .game-name {
+            font-size: 20px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 내 게임 놀이터</h1>
+    <p>내가 만든 게임과 앱들이에요!</p>
+
+    <div class="games">
+        <a href="malangtalk.html" class="game-card">
+            <div class="emoji">💬</div>
+            <div class="game-name">말랑톡</div>
+        </a>
+
+        <a href="flight.html" class="game-card">
+            <div class="emoji">✈️</div>
+            <div class="game-name">비행기 게임</div>
+        </a>
+
+        <a href="handgun.html" class="game-card">
+            <div class="emoji">🔫</div>
+            <div class="game-name">손 총 게임</div>
+        </a>
+        
+        <a href="citydrive.html" class="game-card">
+            <div class="emoji">🚗</div>
+            <div class="game-name">시티 드라이브</div>
+        </a>
+
+    </div>
+</body>
+</html>
