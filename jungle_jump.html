@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>정글 점프</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1f12;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    user-select: none;
+  }
+  h1 { color: #d4f0c0; margin-bottom: 10px; letter-spacing: 4px; }
+  #wrap { position: relative; }
+  canvas {
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.6);
+    display: block;
+    cursor: pointer;
+  }
+  #hint { color: #7ea86f; margin-top: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>🌿 정글 점프 🌿</h1>
+<div id="wrap"><canvas id="game" width="900" height="420"></canvas></div>
+<div id="hint">스페이스바 / 클릭 / 터치로 점프 · 두 번 누르면 더블 점프!</div>
+<script>
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+// 구형 브라우저 호환 (roundRect 미지원 시)
+if (!ctx.roundRect) ctx.roundRect = function(x, y, w, h) { this.rect(x, y, w, h); };
+const W = cv.width, H = cv.height;
+const GROUND = H - 60;
+
+let state = 'ready'; // ready | play | over
+let score = 0, best = 0, speed = 5, frame = 0;
+
+// ---------- 플레이어 ----------
+const player = {
+  x: 130, y: GROUND, vy: 0, w: 34, h: 78,
+  jumps: 0, maxJumps: 2, run: 0,
+  reset() { this.y = GROUND; this.vy = 0; this.jumps = 0; }
+};
+
+// ---------- 장애물 ----------
+let obstacles = [];
+function spawnObstacle() {
+  const types = ['rock', 'log', 'snake', 'plant'];
+  const t = types[Math.floor(Math.random() * types.length)];
+  const o = { type: t, x: W + 40 };
+  if (t === 'rock')  { o.w = 44; o.h = 40; }
+  if (t === 'log')   { o.w = 70; o.h = 34; }
+  if (t === 'snake') { o.w = 56; o.h = 26; }
+  if (t === 'plant') { o.w = 38; o.h = 58; }
+  obstacles.push(o);
+}
+let nextSpawn = 90;
+
+// ---------- 배경 요소 ----------
+const farTrees = [], midTrees = [], bushes = [], vines = [], birds = [];
+function rnd(a, b) { return a + Math.random() * (b - a); }
+for (let i = 0; i < 10; i++) farTrees.push({ x: i * 110 + rnd(-30, 30), h: rnd(120, 200), w: rnd(50, 90) });
+for (let i = 0; i < 7; i++)  midTrees.push({ x: i * 160 + rnd(-40, 40), h: rnd(180, 260), w: rnd(26, 40) });
+for (let i = 0; i < 12; i++) bushes.push({ x: i * 90 + rnd(-20, 20), r: rnd(18, 34) });
+for (let i = 0; i < 6; i++)  vines.push({ x: i * 170 + rnd(-50, 50), len: rnd(60, 150), sway: rnd(0, 6.28) });
+for (let i = 0; i < 3; i++)  birds.push({ x: rnd(0, W), y: rnd(40, 120), sp: rnd(0.5, 1.2), ph: rnd(0, 6.28) });
+
+// ---------- 그리기: 배경 ----------
+function drawBackground() {
+  // 하늘 (안개 낀 정글)
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#a8d5a2');
+  sky.addColorStop(0.5, '#7db87a');
+  sky.addColorStop(1, '#4e8a52');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  // 태양 빛
+  const sun = ctx.createRadialGradient(W - 180, 70, 10, W - 180, 70, 140);
+  sun.addColorStop(0, 'rgba(255,250,200,.8)');
+  sun.addColorStop(1, 'rgba(255,250,200,0)');
+  ctx.fillStyle = sun;
+  ctx.fillRect(0, 0, W, H);
+
+  // 원경 나무 (느리게)
+  ctx.fillStyle = '#3c6e46';
+  farTrees.forEach(t => {
+    const x = ((t.x - frame * speed * 0.15) % (W + 140)) + (((t.x - frame * speed * 0.15) % (W + 140)) < -140 ? W + 140 : 0);
+    const px = x < -140 ? x + W + 140 : x;
+    ctx.beginPath();
+    ctx.ellipse(px, GROUND - t.h * 0.55, t.w, t.h * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // 중경 나무 줄기 + 잎
+  midTrees.forEach(t => {
+    let x = (t.x - frame * speed * 0.4) % (W + 200);
+    if (x < -200) x += W + 200;
+    ctx.fillStyle = '#4a3826';
+    ctx.fillRect(x, GROUND - t.h, t.w, t.h);
+    ctx.fillStyle = '#2f5d38';
+    ctx.beginPath();
+    ctx.ellipse(x + t.w / 2, GROUND - t.h, t.w * 2.6, 55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3a7245';
+    ctx.beginPath();
+    ctx.ellipse(x + t.w / 2 - 20, GROUND - t.h - 25, t.w * 1.8, 40, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // 늘어진 덩굴
+  ctx.strokeStyle = '#2c5233';
+  ctx.lineWidth = 4;
+  vines.forEach(v => {
+    let x = (v.x - frame * speed * 0.4) % (W + 200);
+    if (x < -200) x += W + 200;
+    const swing = Math.sin(frame * 0.03 + v.sway) * 12;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.quadraticCurveTo(x + swing / 2, v.len / 2, x + swing, v.len);
+    ctx.stroke();
+    ctx.fillStyle = '#3a7245';
+    ctx.beginPath();
+    ctx.ellipse(x + swing, v.len, 8, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2c5233';
+  });
+
+  // 새
+  birds.forEach(b => {
+    b.x -= b.sp + speed * 0.1;
+    if (b.x < -20) { b.x = W + 20; b.y = rnd(40, 120); }
+    const flap = Math.sin(frame * 0.2 + b.ph) * 6;
+    ctx.strokeStyle = '#1e3d26';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(b.x - 8, b.y - flap);
+    ctx.quadraticCurveTo(b.x, b.y, b.x + 8, b.y - flap);
+    ctx.stroke();
+  });
+
+  // 땅
+  ctx.fillStyle = '#5a4630';
+  ctx.fillRect(0, GROUND, W, H - GROUND);
+  ctx.fillStyle = '#3f6b3a';
+  ctx.fillRect(0, GROUND, W, 10);
+  // 풀 텍스처
+  ctx.strokeStyle = '#4d8047';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 45; i++) {
+    let gx = (i * 22 - frame * speed) % W;
+    if (gx < 0) gx += W;
+    ctx.beginPath();
+    ctx.moveTo(gx, GROUND + 8);
+    ctx.lineTo(gx + 3, GROUND - 4);
+    ctx.stroke();
+  }
+
+  // 전경 수풀
+  bushes.forEach(b => {
+    let x = (b.x - frame * speed * 0.8) % (W + 80);
+    if (x < -80) x += W + 80;
+    ctx.fillStyle = '#26492e';
+    ctx.beginPath();
+    ctx.arc(x, GROUND + 8, b.r, Math.PI, 0);
+    ctx.fill();
+  });
+}
+
+// ---------- 그리기: 사람 캐릭터 ----------
+function drawPlayer() {
+  const p = player;
+  const onGround = p.y >= GROUND - 0.5;
+  const t = p.run;
+  const legSwing = onGround ? Math.sin(t * 0.3) : 0.5;   // -1 ~ 1
+  const armSwing = onGround ? Math.sin(t * 0.3 + Math.PI) : -0.6;
+  const bob = onGround ? Math.abs(Math.sin(t * 0.3)) * 4 : 0;
+
+  const SKIN = '#eeb98a', SHIRT = '#e8552e', PANTS = '#3d5a80', SHOE = '#2b2b2b', HAIR = '#3b2b1d';
+  const cx = p.x;                    // 몸 중심 x
+  const hipY = p.y - 48 - bob;       // 엉덩이 y
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 그림자
+  const shScale = Math.max(0.3, 1 - (GROUND - p.y) / 250);
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath();
+  ctx.ellipse(cx, GROUND + 6, 28 * shScale, 7 * shScale, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 팔다리를 굵은 선으로 (허벅지→무릎→발 형태)
+  function limb(x1, y1, dx1, dy1, dx2, dy2, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 + dx1, y1 + dy1);
+    ctx.lineTo(x1 + dx1 + dx2, y1 + dy1 + dy2);
+    ctx.stroke();
+    return [x1 + dx1 + dx2, y1 + dy1 + dy2];
+  }
+
+  // ── 뒷다리 (바지)
+  let foot = limb(cx, hipY, -legSwing * 16, 22, legSwing * 6 + 4, 22, PANTS, 13);
+  ctx.fillStyle = SHOE;
+  ctx.beginPath(); ctx.ellipse(foot[0] + 6, foot[1] + 1, 11, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // ── 뒷팔 (피부)
+  limb(cx - 2, hipY - 34, -armSwing * 14, 16, -armSwing * 8 - 6, 12, SKIN, 9);
+
+  // ── 몸통 (셔츠) : 채워진 몸통
+  ctx.fillStyle = SHIRT;
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, hipY);
+  ctx.lineTo(cx - 10, hipY - 38);
+  ctx.quadraticCurveTo(cx + 2, hipY - 44, cx + 14, hipY - 38);
+  ctx.lineTo(cx + 12, hipY);
+  ctx.quadraticCurveTo(cx, hipY + 6, cx - 12, hipY);
+  ctx.fill();
+  // 셔츠 명암
+  ctx.fillStyle = 'rgba(0,0,0,.12)';
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, hipY);
+  ctx.lineTo(cx - 10, hipY - 38);
+  ctx.lineTo(cx - 2, hipY - 40);
+  ctx.lineTo(cx - 3, hipY + 1);
+  ctx.fill();
+
+  // ── 목 + 머리
+  const headX = cx + 6, headY = hipY - 56;
+  ctx.strokeStyle = SKIN;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(cx + 3, hipY - 38);
+  ctx.lineTo(headX - 1, headY + 10);
+  ctx.stroke();
+  // 얼굴
+  ctx.fillStyle = SKIN;
+  ctx.beginPath();
+  ctx.arc(headX, headY, 13, 0, Math.PI * 2);
+  ctx.fill();
+  // 머리카락 (앞머리 포함)
+  ctx.fillStyle = HAIR;
+  ctx.beginPath();
+  ctx.arc(headX - 2, headY - 3, 13, Math.PI * 0.85, Math.PI * 2.05);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(headX - 8, headY - 6, 7, 9, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  // 귀
+  ctx.fillStyle = SKIN;
+  ctx.beginPath();
+  ctx.arc(headX - 8, headY + 2, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  // 눈
+  ctx.fillStyle = '#1c1c1c';
+  ctx.beginPath();
+  ctx.arc(headX + 7, headY - 1, 2, 0, Math.PI * 2);
+  ctx.fill();
+  // 눈썹
+  ctx.strokeStyle = HAIR;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(headX + 4, headY - 6);
+  ctx.lineTo(headX + 10, headY - 5);
+  ctx.stroke();
+  // 입
+  ctx.strokeStyle = '#a05a3a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(headX + 5, headY + 5, 4, 0.15, Math.PI * 0.75);
+  ctx.stroke();
+  // 볼터치
+  ctx.fillStyle = 'rgba(230,120,90,.35)';
+  ctx.beginPath();
+  ctx.arc(headX + 9, headY + 4, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 앞다리 (바지)
+  foot = limb(cx + 2, hipY, legSwing * 16, 22, -legSwing * 6 + 4, 22, PANTS, 13);
+  ctx.fillStyle = SHOE;
+  ctx.beginPath(); ctx.ellipse(foot[0] + 6, foot[1] + 1, 11, 5, 0, 0, Math.PI * 2); ctx.fill();
+  // 신발 흰 밑창
+  ctx.fillStyle = '#e8e8e8';
+  ctx.beginPath(); ctx.ellipse(foot[0] + 6, foot[1] + 4, 11, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // ── 앞팔 (피부) — 소매 포함
+  ctx.strokeStyle = SHIRT;
+  ctx.lineWidth = 11;
+  ctx.beginPath();
+  ctx.moveTo(cx + 4, hipY - 34);
+  ctx.lineTo(cx + 4 + armSwing * 8, hipY - 34 + 9);
+  ctx.stroke();
+  limb(cx + 4, hipY - 34, armSwing * 14, 16, armSwing * 8 - 6, 12, SKIN, 9);
+
+  ctx.restore();
+}
+
+// ---------- 그리기: 장애물 ----------
+function drawObstacle(o) {
+  const y = GROUND;
+  ctx.save();
+  if (o.type === 'rock') {
+    ctx.fillStyle = '#6e6e66';
+    ctx.beginPath();
+    ctx.moveTo(o.x, y);
+    ctx.lineTo(o.x + 8, y - o.h);
+    ctx.lineTo(o.x + o.w - 10, y - o.h + 6);
+    ctx.lineTo(o.x + o.w, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#84847b';
+    ctx.beginPath();
+    ctx.moveTo(o.x + 8, y - o.h);
+    ctx.lineTo(o.x + 20, y - o.h + 12);
+    ctx.lineTo(o.x + 4, y - 8);
+    ctx.closePath();
+    ctx.fill();
+  } else if (o.type === 'log') {
+    ctx.fillStyle = '#6b4a2b';
+    ctx.fillRect(o.x, y - o.h, o.w, o.h);
+    ctx.fillStyle = '#8a6238';
+    ctx.beginPath();
+    ctx.ellipse(o.x + o.w, y - o.h / 2, 8, o.h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#5a3d22';
+    ctx.lineWidth = 2;
+    for (let i = 1; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(o.x + 5, y - o.h + i * 11);
+      ctx.lineTo(o.x + o.w - 8, y - o.h + i * 11);
+      ctx.stroke();
+    }
+  } else if (o.type === 'snake') {
+    ctx.strokeStyle = '#2d7a2d';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    const wig = Math.sin(frame * 0.3) * 3;
+    ctx.moveTo(o.x, y - 6);
+    ctx.quadraticCurveTo(o.x + o.w * 0.35, y - o.h - wig, o.x + o.w * 0.65, y - 8);
+    ctx.stroke();
+    // 머리
+    ctx.fillStyle = '#2d7a2d';
+    ctx.beginPath();
+    ctx.ellipse(o.x + o.w * 0.75, y - o.h + 4, 9, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff3b3b';
+    ctx.fillRect(o.x + o.w * 0.75 + 8, y - o.h + 3, 8, 1.6);
+  } else if (o.type === 'plant') {
+    // 식충식물
+    ctx.strokeStyle = '#2f6b35';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(o.x + o.w / 2, y);
+    ctx.lineTo(o.x + o.w / 2, y - o.h + 16);
+    ctx.stroke();
+    ctx.fillStyle = '#c0392b';
+    const open = Math.sin(frame * 0.15) * 0.2 + 0.4;
+    ctx.beginPath();
+    ctx.ellipse(o.x + o.w / 2, y - o.h + 10, 16, 14, -open, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(o.x + o.w / 2 - 12 + i * 8, y - o.h + 2);
+      ctx.lineTo(o.x + o.w / 2 - 8 + i * 8, y - o.h + 8);
+      ctx.lineTo(o.x + o.w / 2 - 4 + i * 8, y - o.h + 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// ---------- UI ----------
+function drawUI() {
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.roundRect(W - 190, 14, 176, 34, 8);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px Segoe UI';
+  ctx.textAlign = 'right';
+  ctx.fillText(`점수 ${Math.floor(score)}   최고 ${Math.floor(best)}`, W - 26, 37);
+
+  if (state === 'ready') {
+    overlay('정글 점프', '스페이스바 또는 클릭으로 시작!');
+  } else if (state === 'over') {
+    overlay('게임 오버!', `점수: ${Math.floor(score)} — 다시 하려면 눌러주세요`);
+  }
+  ctx.textAlign = 'left';
+}
+function overlay(title, sub) {
+  ctx.fillStyle = 'rgba(10,25,15,.55)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#eaf7dd';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 46px Segoe UI';
+  ctx.fillText(title, W / 2, H / 2 - 16);
+  ctx.font = '20px Segoe UI';
+  ctx.fillText(sub, W / 2, H / 2 + 24);
+}
+
+// ---------- 로직 ----------
+function jump() {
+  if (state !== 'play') {
+    if (state === 'over' || state === 'ready') startGame();
+    return;
+  }
+  if (player.jumps < player.maxJumps) {
+    player.vy = player.jumps === 0 ? -14.5 : -12.5;
+    player.jumps++;
+  }
+}
+function startGame() {
+  state = 'play';
+  score = 0; speed = 5; frame = 0;
+  obstacles = []; nextSpawn = 80;
+  player.reset();
+}
+function update() {
+  frame++;
+  if (state === 'play') {
+    score += 0.15;
+    speed = 5 + Math.min(6, score * 0.01);
+    player.run += speed * 0.8;
+
+    // 중력
+    player.vy += 0.7;
+    player.y += player.vy;
+    if (player.y >= GROUND) { player.y = GROUND; player.vy = 0; player.jumps = 0; }
+
+    // 장애물
+    if (--nextSpawn <= 0) {
+      spawnObstacle();
+      nextSpawn = rnd(55, 110) - Math.min(25, score * 0.05);
+    }
+    obstacles.forEach(o => o.x -= speed);
+    obstacles = obstacles.filter(o => o.x + o.w > -20);
+
+    // 충돌 (약간 관대한 히트박스)
+    for (const o of obstacles) {
+      const px1 = player.x - 12, px2 = player.x + 12;
+      const py1 = player.y - player.h + 8, py2 = player.y;
+      const ox1 = o.x + 6, ox2 = o.x + o.w - 6;
+      const oy1 = GROUND - o.h + 6, oy2 = GROUND;
+      if (px1 < ox2 && px2 > ox1 && py1 < oy2 && py2 > oy1) {
+        state = 'over';
+        best = Math.max(best, score);
+      }
+    }
+  }
+}
+function loop() {
+  update();
+  drawBackground();
+  obstacles.forEach(drawObstacle);
+  drawPlayer();
+  drawUI();
+  requestAnimationFrame(loop);
+}
+
+// ---------- 입력 ----------
+addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); }
+});
+cv.addEventListener('pointerdown', jump);
+
+loop();
+</script>
+</body>
+</html>
