@@ -1,6 +1,23 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Sniper Ops</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;min-height:100%;background:#06080c;overflow-x:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;
+       padding:8px calc(8px + env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) calc(8px + env(safe-area-inset-left,0px))}
+  @media (pointer:coarse){body{padding-top:calc(6px + env(safe-area-inset-top,0px))}}
+</style>
+</head>
+<body>
 <h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">스코프로 조준해 다양한 임무 표적을 저격하는 캔버스 게임</h2>
 <style>
-  #sniperGame{background:#0b0e14;border-radius:14px;padding:8px;max-width:760px;margin:auto;box-shadow:0 14px 38px rgba(0,0,0,.28);user-select:none;-webkit-user-select:none}
+  #sniperGame{background:#0b0e14;border-radius:14px;padding:8px;max-width:760px;width:100%;margin:auto;box-shadow:0 14px 38px rgba(0,0,0,.28);user-select:none;-webkit-user-select:none}
   #sniperStage{position:relative}
   #sn{width:100%;display:block;border-radius:9px;touch-action:none;cursor:crosshair;background:#111}
   #sniperQuick{position:absolute;right:10px;top:44px;display:flex;gap:6px;z-index:2}
@@ -32,6 +49,7 @@
 (() => {
 "use strict";
 const cv = document.getElementById('sn'), ctx = cv.getContext('2d');
+const IS_TOUCH = window.matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
 const W = 660, H = 460, GY = 372;
 const rand = (a,b) => a + Math.random()*(b-a);
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
@@ -482,7 +500,7 @@ function draw() {
     else { ctx.fillStyle = '#ffd166';
       for (let i = 0; i < mag; i++) ctx.fillRect(288 + i*11, H-26, 7, 14); }
     ctx.fillStyle = '#8a93a6'; ctx.textAlign = 'right';
-    ctx.fillText('Space 발사 · Z 줌 · Shift 숨 · R 장전 · P 정지 · M 음소거', W-10, H-24);
+    ctx.fillText(IS_TOUCH ? '드래그 조준 · 탭 발사 · 아래 버튼 사용' : 'Space 발사 · Z 줌 · Shift 숨 · R 장전 · P 정지 · M 음소거', W-10, H-24);
     ctx.textAlign = 'left';
     if (M.civ) { ctx.fillStyle = '#ff9e40'; ctx.fillText('민간인(흰옷) 오사 ' + civK + '/2', 10, 42); }
     if (noticeT > 0) {
@@ -508,7 +526,7 @@ function draw() {
       const rec = records.missions[mi];
       if (rec) { ctx.font='12px monospace'; ctx.fillStyle='#8a93a6'; ctx.fillText('최고 기록 ' + rec.score + '점 · 명중률 ' + rec.acc + '%', W/2, 292); }
       ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#5dca87';
-      if (Math.floor(frame/30) % 2 === 0) ctx.fillText('▶ 클릭해서 작전 개시', W/2, 320);
+      if (Math.floor(frame/30) % 2 === 0) ctx.fillText(IS_TOUCH ? '▶ 탭해서 작전 개시' : '▶ 클릭해서 작전 개시', W/2, 320);
     } else if (state === ST.RESULT) {
       ctx.font = 'bold 34px monospace';
       ctx.fillStyle = resultOK ? '#5dca87' : '#ff6b7a';
@@ -609,3 +627,5 @@ updateUi();
 (function loop(){ update(); draw(); requestAnimationFrame(loop); })();
 })();
 </script>
+</body>
+</html>

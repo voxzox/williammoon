@@ -951,6 +951,11 @@
             initMobileControls();
             window.removeEventListener('touchstart', once);
         });
+        // 주 입력이 터치인 기기(모바일/태블릿)라면 첫 터치를 기다리지 않고 즉시 컨트롤 표시
+        // (터치스크린 노트북 등 PC는 pointer:fine이므로 기존 PC UI 유지)
+        if (window.matchMedia('(pointer: coarse)').matches) {
+            initMobileControls();
+        }
 
         document.getElementById('mobileHijackBtn').addEventListener('click', () => {
             toggleCarDriving();

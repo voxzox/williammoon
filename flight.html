@@ -2,24 +2,31 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>3D Flight Simulator</title>
     <!-- Tailwind CSS for UI styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {
+        html, body {
             margin: 0;
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
             background-color: #bae6fd;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent;
+            position: fixed;
+            inset: 0;
         }
         #canvas-container {
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             position: absolute;
             top: 0;
             left: 0;
@@ -27,8 +34,24 @@
         }
         /* 조이스틱 및 터치 조작 UI (모바일용) */
         .touch-button {
-            active:scale-95;
             transition: transform 0.1s;
+            touch-action: none;
+        }
+        /* 터치 기기에서 모바일 컨트롤 표시, 키보드 안내 숨김 */
+        #mobile-controls { display: none; }
+        body.touch-device #mobile-controls { display: flex; }
+        body.touch-device #instructions { display: none; }
+        /* 모바일에서 HUD를 컴팩트하게 + 안전영역 확보 */
+        body.touch-device #hud-panel {
+            top: calc(8px + env(safe-area-inset-top, 0px));
+            left: calc(8px + env(safe-area-inset-left, 0px));
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        body.touch-device #hud-panel h1 { font-size: 14px; margin-bottom: 4px; }
+        body.touch-device #mobile-controls {
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            right: calc(12px + env(safe-area-inset-right, 0px));
         }
     </style>
 </head>
@@ -38,7 +61,7 @@
     <div id="canvas-container"></div>
 
     <!-- HUD Overlay -->
-    <div class="absolute top-4 left-4 z-10 bg-white/80 backdrop-blur-md text-slate-800 p-4 rounded-xl border border-white/20 pointer-events-none font-mono shadow-lg">
+    <div id="hud-panel" class="absolute top-4 left-4 z-10 bg-white/80 backdrop-blur-md text-slate-800 p-4 rounded-xl border border-white/20 pointer-events-none font-mono shadow-lg">
         <h1 class="text-xl font-bold text-sky-600 mb-2">FLIGHT SIMULATOR</h1>
         <div class="space-y-1 text-sm font-semibold">
             <div>Score: <span id="score-val" class="text-amber-500 font-bold">0</span></div>
@@ -75,8 +98,8 @@
         </ul>
     </div>
 
-    <!-- Mobile Controls (Visible on touch devices, but also useful for quick tests) -->
-    <div class="absolute bottom-6 right-6 z-10 flex flex-col items-end space-y-4 md:hidden">
+    <!-- Mobile Controls (터치 기기에서만 표시) -->
+    <div id="mobile-controls" class="absolute bottom-6 right-6 z-10 flex-col items-end space-y-4">
         <!-- Fire Button -->
         <button id="mobile-fire" class="touch-button w-16 h-16 bg-red-600/90 active:bg-red-700 text-white font-bold rounded-full border-2 border-red-400 shadow-lg flex items-center justify-center text-sm">
             FIRE
@@ -106,6 +129,10 @@
     </div>
 
     <script>
+        // --- 기기 감지: 터치 기기면 모바일 UI, 아니면 PC UI ---
+        const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+        if (IS_TOUCH) document.body.classList.add('touch-device');
+
         // --- GAME STATE ---
         let score = 0;
         let speed = 100;
@@ -560,8 +587,9 @@
             const fireBtn = document.getElementById('mobile-fire');
 
             const bindTouch = (elem, keyName) => {
-                elem.addEventListener('touchstart', (e) => { e.preventDefault(); mobileKeys[keyName] = true; });
-                elem.addEventListener('touchend', (e) => { e.preventDefault(); mobileKeys[keyName] = false; });
+                elem.addEventListener('touchstart', (e) => { e.preventDefault(); mobileKeys[keyName] = true; }, { passive: false });
+                elem.addEventListener('touchend', (e) => { e.preventDefault(); mobileKeys[keyName] = false; }, { passive: false });
+                elem.addEventListener('touchcancel', () => { mobileKeys[keyName] = false; });
                 elem.addEventListener('mousedown', () => { mobileKeys[keyName] = true; });
                 elem.addEventListener('mouseup', () => { mobileKeys[keyName] = false; });
                 elem.addEventListener('mouseleave', () => { mobileKeys[keyName] = false; });
@@ -572,8 +600,20 @@
             bindTouch(leftBtn, 'left');
             bindTouch(rightBtn, 'right');
 
-            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); fireBullet(); });
-            fireBtn.addEventListener('mousedown', () => { fireBullet(); });
+            // 발사 버튼: 누르고 있으면 연사
+            let fireInterval = null;
+            const startFire = () => {
+                if (fireInterval) return;
+                fireBullet();
+                fireInterval = setInterval(fireBullet, 200);
+            };
+            const stopFire = () => { clearInterval(fireInterval); fireInterval = null; };
+            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startFire(); }, { passive: false });
+            fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopFire(); }, { passive: false });
+            fireBtn.addEventListener('touchcancel', stopFire);
+            fireBtn.addEventListener('mousedown', startFire);
+            fireBtn.addEventListener('mouseup', stopFire);
+            fireBtn.addEventListener('mouseleave', stopFire);
         };
         setupMobileButtons();
 
@@ -829,11 +869,13 @@
         }
 
         // --- 창 반응형 구조 조정 ---
-        window.addEventListener('resize', () => {
+        const handleResize = () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        };
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', () => setTimeout(handleResize, 200));
 
         // 시작 신호
         window.onload = function() {

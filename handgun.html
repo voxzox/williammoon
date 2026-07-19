@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Hand Gesture Gun - Dual Wield Mode</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -21,6 +23,23 @@
         .ammo-bit.empty { background: rgba(255,255,255,0.05); box-shadow: none; transform: scaleY(0.5); }
         .reload-warn { color: #fbbf24; font-weight: bold; animation: blink 0.8s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.95); } }
+        /* ---- 모바일 최적화 ---- */
+        html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+        @media (max-width: 768px), (pointer: coarse) and (max-height: 500px) {
+            #ui-layer { top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; width: calc(100% - 20px); align-items: flex-start; }
+            .hud-box { padding: 8px 12px; border-radius: 10px; }
+            .score-val { font-size: 1.5rem; }
+            #ammo-container { width: 160px; margin-top: 6px; gap: 2px; }
+            .ammo-bit { height: 9px; }
+            #combo-layer { font-size: 2.2rem; white-space: nowrap; }
+            #video-container {
+                width: 120px; height: 90px; border-radius: 8px;
+                bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+                right: calc(12px + env(safe-area-inset-right, 0px));
+            }
+            .hud-box h1 { font-size: 9px; }
+            .hud-box p { font-size: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -47,6 +66,9 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
+    // 기기 감지: 모바일이면 성능 우선 설정 + 터치 사격 지원
+    const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+
     const videoElement = document.getElementById('input_video');
     const canvasElement = document.getElementById('gameCanvas');
     const ctx = canvasElement.getContext('2d');
@@ -91,7 +113,7 @@
         if(currentAmmo === 0) {
             hintText.innerHTML = '<span class="reload-warn">AMMO DEPLETED! FIND GOLD DRONE</span>';
         } else {
-            hintText.innerText = '양손의 검지를 까딱여 사격하세요!';
+            hintText.innerText = IS_TOUCH ? '검지 까딱 사격 또는 화면 터치!' : '양손의 검지를 까딱여 사격하세요!';
         }
     }
 
@@ -104,6 +126,7 @@
     window.addEventListener('resize', resize);
     resize();
     initAmmoUI();
+    updateAmmoUI();
 
     function drawBackground() {
         const grad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width);
@@ -373,7 +396,7 @@
     });
     hands.setOptions({
         maxNumHands: 2,
-        modelComplexity: 1,
+        modelComplexity: IS_TOUCH ? 0 : 1, // 모바일: 가벼운 모델로 프레임 확보
         minDetectionConfidence: 0.8,
         minTrackingConfidence: 0.8
     });
@@ -381,9 +404,18 @@
 
     const camera = new Camera(videoElement, {
         onFrame: async () => { await hands.send({image: videoElement}); },
-        width: 640, height: 480
+        width: IS_TOUCH ? 480 : 640,
+        height: IS_TOUCH ? 360 : 480
     });
     camera.start();
+
+    // 모바일 보조 조작: 화면을 터치해 그 지점을 사격
+    canvasElement.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        for (const t of e.changedTouches) shoot(t.clientX, t.clientY);
+    }, { passive: false });
+    // PC 보조 조작: 마우스 클릭 사격
+    canvasElement.addEventListener('mousedown', (e) => shoot(e.clientX, e.clientY));
 
     function animate() { requestAnimationFrame(animate); }
     animate();
