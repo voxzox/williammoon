@@ -1,0 +1,611 @@
+<h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">스코프로 조준해 다양한 임무 표적을 저격하는 캔버스 게임</h2>
+<style>
+  #sniperGame{background:#0b0e14;border-radius:14px;padding:8px;max-width:760px;margin:auto;box-shadow:0 14px 38px rgba(0,0,0,.28);user-select:none;-webkit-user-select:none}
+  #sniperStage{position:relative}
+  #sn{width:100%;display:block;border-radius:9px;touch-action:none;cursor:crosshair;background:#111}
+  #sniperQuick{position:absolute;right:10px;top:44px;display:flex;gap:6px;z-index:2}
+  #sniperQuick button,#sniperMobile button{border:1px solid rgba(255,255,255,.18);background:rgba(10,13,20,.82);color:#e8ecf4;border-radius:8px;font:700 12px/1 monospace;padding:9px 10px;cursor:pointer;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+  #sniperQuick button:hover,#sniperMobile button:hover{background:rgba(35,42,56,.92)}
+  #sniperQuick button:active,#sniperMobile button:active{transform:translateY(1px)}
+  #sniperMobile{display:none;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+  #sniperMobile button{min-height:42px;font-size:13px}
+  #snFire{border-color:rgba(255,107,122,.55)!important;color:#ff8c98!important}
+  #snBreath.active{border-color:rgba(127,184,230,.8);color:#9dd2ff;background:rgba(28,65,92,.9)}
+  @media (pointer:coarse),(max-width:760px){#sniperMobile{display:grid}#sniperQuick{top:40px}#sniperQuick button{padding:8px;font-size:11px}}
+</style>
+<div id="sniperGame">
+  <div id="sniperStage">
+    <canvas id="sn" width="660" height="460" aria-label="저격 임무 게임"></canvas>
+    <div id="sniperQuick">
+      <button id="snPause" type="button" aria-label="일시정지">Ⅱ</button>
+      <button id="snMute" type="button" aria-label="음소거">🔊</button>
+    </div>
+  </div>
+  <div id="sniperMobile" aria-label="모바일 조작 버튼">
+    <button id="snZoom" type="button">ZOOM 2.2×</button>
+    <button id="snBreath" type="button">숨 참기</button>
+    <button id="snReload" type="button">재장전</button>
+    <button id="snFire" type="button">발사</button>
+  </div>
+</div>
+<script>
+(() => {
+"use strict";
+const cv = document.getElementById('sn'), ctx = cv.getContext('2d');
+const W = 660, H = 460, GY = 372;
+const rand = (a,b) => a + Math.random()*(b-a);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const $ = id => document.getElementById(id);
+const ui = { pause:$('snPause'), mute:$('snMute'), zoom:$('snZoom'), breath:$('snBreath'), reload:$('snReload'), fire:$('snFire') };
+const STORE_KEY = 'sniperOpsV2';
+function loadRecords(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {bestTotal:0, missions:[]}; }
+  catch(e){ return {bestTotal:0, missions:[]}; }
+}
+function saveRecords(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(records)); } catch(e){} }
+let records = loadRecords();
+if (!Array.isArray(records.missions)) records.missions = [];
+if (!Number.isFinite(records.bestTotal)) records.bestTotal = 0;
+
+let ac = null, muted = false;
+function snd(kind) {
+  if (muted) return;
+  try {
+    if (!ac) ac = new (window.AudioContext||window.webkitAudioContext)();
+    const t = ac.currentTime;
+    if (kind === 'shot' || kind === 'boom') {
+      const dur = kind==='shot' ? .14 : .5;
+      const buf = ac.createBuffer(1, ac.sampleRate*dur, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/d.length, kind==='shot'?1.4:2.2);
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const f = ac.createBiquadFilter(); f.type='lowpass';
+      f.frequency.setValueAtTime(kind==='shot'?2600:700, t);
+      f.frequency.exponentialRampToValueAtTime(kind==='shot'?300:80, t+dur);
+      const g = ac.createGain(); g.gain.setValueAtTime(kind==='shot'?.5:.6, t);
+      g.gain.exponentialRampToValueAtTime(.001, t+dur);
+      src.connect(f); f.connect(g); g.connect(ac.destination); src.start(t);
+    } else {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = kind==='head' ? 1850 : (kind==='hit' ? 1300 : 500); o.type='square';
+      g.gain.setValueAtTime(kind==='head' ? .16 : .12, t); g.gain.exponentialRampToValueAtTime(.001, t+.06);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+.07);
+    }
+  } catch(e){}
+}
+
+const MISSIONS = [
+ { name:'사격 훈련', theme:0, goal:8,  time:60,  types:['board'], spawn:55, brief:['훈련장의 표적판 8개를 명중시켜라.','표적은 잠시 후 사라진다. 침착하게.'] },
+ { name:'최전선 저격', theme:1, goal:8,  time:80,  types:['soldier'], civ:true, spawn:75, brief:['적 보병 8명을 제거하라.','흰옷 민간인 사살 금지! 2명 오사 시 임무 실패.'] },
+ { name:'호송대 차단', theme:2, goal:6,  time:80,  types:['jeep','truck'], spawn:85, brief:['적 보급 호송대를 차단하라.','지프 1발, 트럭 2발. 총 6대 파괴.'] },
+ { name:'철갑 사냥', theme:3, goal:4,  time:95,  types:['tank'], spawn:120, brief:['적 전차 4대를 격파하라. 3발 필요.','전차가 조준하면 붉게 깜빡인다. 먼저 쏴라!'] },
+ { name:'공중 위협', theme:4, goal:5,  time:95,  types:['heli'], spawn:110, brief:['공격 헬기 5대를 격추하라. 2발 필요.','헬기의 기총 사격에 주의하라.'] },
+ { name:'초음속 요격', theme:5, goal:5,  time:80,  types:['jet'], spawn:95, brief:['적 제트기 5대를 요격하라.','매우 빠르다. 진로를 예측해서 쏴라.'] },
+ { name:'최종 작전', theme:6, goal:12, time:130, types:['soldier','jeep','tank','heli','jet'], civ:true, spawn:65, brief:['모든 적 전력 12기를 섬멸하라.','보병·차량·전차·헬기·제트기 총출동. 민간인 주의!'] }
+];
+const SPEC = {
+ board:{hp:1,sc:100,w:34,h:46}, soldier:{hp:1,sc:150,w:18,h:36,atk:210,dmg:6},
+ civ:{hp:1,sc:-400,w:18,h:36}, jeep:{hp:1,sc:200,w:54,h:26}, truck:{hp:2,sc:250,w:72,h:32},
+ tank:{hp:3,sc:400,w:68,h:32,atk:250,dmg:16}, heli:{hp:2,sc:350,w:58,h:28,atk:190,dmg:10},
+ jet:{hp:1,sc:500,w:58,h:20}
+};
+const THEMES = [
+ {sky:'#8fbf9f',far:'#5a8f6e',near:'#3f7354',gnd:'#4c7a45',n:'훈련장'},
+ {sky:'#9aa5b1',far:'#6b7684',near:'#4a5361',gnd:'#5d5f63',n:'시가지'},
+ {sky:'#e8c98f',far:'#c99a5b',near:'#a87840',gnd:'#c2965a',n:'사막'},
+ {sky:'#c9d6e2',far:'#93a8bd',near:'#6e849b',gnd:'#e8eef4',n:'설원'},
+ {sky:'#a7cbe0',far:'#6d9bc0',near:'#3d6f9a',gnd:'#3a6a94',n:'해안'},
+ {sky:'#b8d4ea',far:'#8fb0cc',near:'#5f83a3',gnd:'#7a8fa3',n:'고지대'},
+ {sky:'#232840',far:'#191d31',near:'#101322',gnd:'#1b1f30',n:'야간 시가지'}
+];
+
+const ST = { BRIEF:0, PLAY:1, RESULT:2, END:3 };
+let state = ST.BRIEF, mi = 0, frame = 0;
+let kills, score, total = 0, hp, timeF, mag, reloadT, bolt, shots, hits, civK, headshots;
+let zoomHi = false, breathHeld = false, breathM = 100, exhaust = 0;
+let paused = false, combo = 0, comboT = 0, bestCombo = 0;
+let hitMarkT = 0, hitMarkWorld = null, hitMarkKill = false, flashT = 0;
+let notice = '', noticeT = 0, noticeCol = '#ffd166';
+let aim = {x:W/2, y:H/2}, swT = rand(0,999);
+let targets = [], parts = [], shake = 0, redF = 0, resultOK = false, resultMsg = '';
+let lastCiv = -9999;
+
+function notify(text, col='#ffd166', frames=70){ notice=text; noticeCol=col; noticeT=frames; }
+function setPaused(v){
+  if (state !== ST.PLAY) v = false;
+  paused = v; breathHeld = false;
+  ui.pause.textContent = paused ? '▶' : 'Ⅱ';
+  ui.pause.setAttribute('aria-label', paused ? '계속하기' : '일시정지');
+}
+function toggleMute(){ muted=!muted; ui.mute.textContent=muted?'🔇':'🔊'; }
+function updateUi(){
+  ui.zoom.textContent = 'ZOOM ' + (zoomHi?'4.2×':'2.2×');
+  ui.breath.classList.toggle('active', breathHeld);
+  ui.pause.disabled = state !== ST.PLAY;
+}
+
+function startMission() {
+  kills = 0; score = 0; hp = 100; mag = 5; reloadT = 0; bolt = 0;
+  shots = 0; hits = 0; civK = 0; headshots = 0; timeF = MISSIONS[mi].time * 60;
+  combo = 0; comboT = 0; bestCombo = 0; hitMarkT = 0; flashT = 0; noticeT = 0;
+  targets = []; parts = []; shake = 0; redF = 0; breathM = 100; exhaust = 0;
+  lastCiv = -9999; paused = false;
+  state = ST.PLAY; updateUi();
+}
+
+function spawn() {
+  const M = MISSIONS[mi];
+  let type = M.types[Math.floor(rand(0, M.types.length))];
+  const civAct = targets.filter(e => e.type === 'civ' && !e.dead).length;
+  if (M.civ && Math.random() < .15 && civAct < 1 && frame - lastCiv > 420) {
+    type = 'civ'; lastCiv = frame;
+  }
+  const sp = SPEC[type], dir = Math.random() < .5 ? 1 : -1;
+  const e = { type, hp: sp.hp, dir, t: 0, dead: 0, tele: 0, atk: sp.atk ? Math.floor(rand(sp.atk*.5, sp.atk)) : 0, vy: 0, rot: 0, flash: 0 };
+  if (type === 'board') { e.x = rand(70, W-70); e.y = GY - rand(0, 26); e.ttl = 270; e.pop = 20; }
+  else if (type === 'soldier' || type === 'civ') { e.x = dir>0 ? -20 : W+20; e.y = GY - rand(0, 30); e.sp = rand(.4,.8); }
+  else if (type === 'jeep') { e.x = dir>0 ? -40 : W+40; e.y = GY - rand(0, 14); e.sp = rand(1.6, 2.3); }
+  else if (type === 'truck') { e.x = dir>0 ? -50 : W+50; e.y = GY - rand(0, 14); e.sp = rand(1.0, 1.4); }
+  else if (type === 'tank') { e.x = dir>0 ? -50 : W+50; e.y = GY - rand(0, 10); e.sp = rand(.4, .55); }
+  else if (type === 'heli') { e.x = dir>0 ? -45 : W+45; e.y = rand(80, 200); e.sp = rand(1.0, 1.5); }
+  else if (type === 'jet') { e.x = dir>0 ? -50 : W+50; e.y = rand(55, 150); e.sp = rand(4.6, 6.2); }
+  targets.push(e);
+}
+
+function boom(x, y, n, col) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, 6.28), s = rand(.6, 3.6);
+    parts.push({x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s - 1, g:.06, life:rand(20,45), max:45, col, sz:rand(2,4)});
+  }
+  parts.push({x, y, ring:1, life:16, max:16, col});
+}
+function smoke(x, y) {
+  parts.push({x:x+rand(-6,6), y, vx:rand(-.2,.2), vy:rand(-.9,-.5), g:0, life:rand(30,55), max:55, col:'#555a60', sz:rand(3,6)});
+}
+
+function dmgPlayer(d) { hp -= d; redF = 18; shake = 12; if (hp <= 0) { hp = 0; endMission(false, '치명상을 입었다'); } }
+function endMission(ok, msg) {
+  if (state !== ST.PLAY) return;
+  resultOK = ok; resultMsg = msg; setPaused(false);
+  const accBonus = Math.round((shots ? hits/shots : 0) * 300);
+  if (ok) {
+    total += score + accBonus;
+    const prev = records.missions[mi] || {score:0, acc:0};
+    records.missions[mi] = {score:Math.max(prev.score||0, score+accBonus), acc:Math.max(prev.acc||0, shots?Math.round(hits/shots*100):0)};
+    records.bestTotal = Math.max(records.bestTotal||0, total);
+    saveRecords();
+  }
+  state = ST.RESULT; updateUi();
+}
+
+function fire() {
+  if (state !== ST.PLAY || paused || bolt > 0 || reloadT > 0) return;
+  if (mag <= 0) { reloadT = 95; notify('재장전!', '#ffd166', 35); return; }
+  mag--; shots++; bolt = 30; flashT = 5; shake = Math.max(shake, 6); snd('shot');
+  const swA = swayAmp();
+  const ix = aim.x + Math.sin(swT*.021)*swA + Math.sin(swT*.047)*swA*.6;
+  const iy = aim.y + Math.cos(swT*.026)*swA + Math.sin(swT*.039)*swA*.5;
+  let best = null, bestMetric = Infinity;
+  for (const e of targets) {
+    if (e.dead) continue;
+    const sp = SPEC[e.type], cy = cyOf(e);
+    const dx = (ix-e.x)/(sp.w/2), dy = (iy-cy)/(sp.h/2);
+    if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+      const metric = dx*dx + dy*dy;
+      if (metric < bestMetric) { bestMetric = metric; best = e; }
+    }
+  }
+  hitMarkWorld = {x:ix,y:iy}; hitMarkKill = false;
+  if (best) {
+    const sp = SPEC[best.type];
+    const head = best.type==='soldier' && Math.abs(ix-best.x)<7 && Math.abs(iy-(best.y-30))<7.5;
+    const bull = best.type==='board' && Math.hypot(ix-best.x, iy-(best.y-32))<5.5;
+    hits++; best.hp -= head ? 2 : 1; best.flash = 6; hitMarkT = 12; snd(head?'head':'hit');
+    parts.push({x:ix, y:iy, vx:rand(-1,1), vy:-1.4, g:.05, life:12, max:12, col:'#fff2c9', sz:2});
+    if (head) { headshots++; score += 200; notify('HEADSHOT +200', '#ff8c98'); }
+    else if (bull) { score += 100; notify('BULLSEYE +100', '#ffd166'); }
+    if (best.hp <= 0) {
+      best.dead = 1; hitMarkKill = true; score += sp.sc;
+      if (best.type === 'civ') {
+        civK++; combo = 0; comboT = 0; notify('민간인 오사 ' + civK + '/2', '#ff6b7a', 90);
+        if (civK >= 2) { endMission(false, '민간인 오사 — 작전 취소'); }
+      } else {
+        kills++;
+        combo = comboT > 0 ? combo + 1 : 1; comboT = 150; bestCombo = Math.max(bestCombo, combo);
+        const comboBonus = Math.max(0, combo-1)*50;
+        if (comboBonus) { score += comboBonus; notify(combo + ' COMBO +' + comboBonus, '#7fb8e6'); }
+        else if (!head && !bull) notify('TARGET DOWN', '#5dca87', 55);
+      }
+      if (best.type==='heli'||best.type==='jet') { best.vx = best.dir*best.sp*.4; snd('boom'); boom(best.x, best.y, 10, '#ff9e40'); }
+      else if (best.type==='jeep'||best.type==='truck'||best.type==='tank') { best.wreck = 130; snd('boom'); boom(best.x, best.y-14, 16, '#ff9e40'); shake = Math.max(shake, 8); }
+      else { boom(best.x, cyOf(best), 8, best.type==='board' ? '#e8d8b0' : '#c96a5a'); best.rm = 1; }
+      if (kills >= MISSIONS[mi].goal && state === ST.PLAY) endMission(true, '임무 완수');
+    } else if (!head && !bull) notify('HIT', '#e8ecf4', 30);
+  } else {
+    combo = 0; comboT = 0; hitMarkT = 0;
+    parts.push({x:ix, y:iy, vx:0, vy:0, g:0, life:10, max:10, col:'#d9d2c0', sz:2, puff:1});
+  }
+  if (mag <= 0 && state === ST.PLAY) reloadT = 95;
+}
+function cyOf(e){ const sp=SPEC[e.type]; return (e.type==='heli'||e.type==='jet') ? e.y : e.y - sp.h/2; }
+function swayAmp(){ return exhaust > 0 ? 9 : (breathHeld && breathM > 0 ? 1.1 : 4.6); }
+
+function update() {
+  frame++;
+  if (noticeT > 0) noticeT--;
+  if (hitMarkT > 0) hitMarkT--;
+  if (flashT > 0) flashT--;
+  if (state !== ST.PLAY || paused) return;
+  swT += breathHeld && breathM > 0 ? .25 : 1;
+  if (comboT > 0) { comboT--; if (comboT === 0) combo = 0; }
+  if (breathHeld && breathM > 0) { breathM -= .9; if (breathM <= 0) { breathM = 0; exhaust = 110; breathHeld = false; } }
+  else breathM = Math.min(100, breathM + .45);
+  if (exhaust > 0) exhaust--;
+  if (bolt > 0) bolt--;
+  if (reloadT > 0) { reloadT--; if (reloadT === 0) mag = 5; }
+  timeF--;
+  if (timeF <= 0) { endMission(false, '시간 초과'); return; }
+  const M = MISSIONS[mi];
+  const act = targets.filter(e => !e.dead && e.type !== 'civ').length;
+  if (frame % M.spawn === 0 && act < 3) spawn();
+  if (act === 0 && frame % 30 === 0) spawn();
+
+  for (let i = targets.length-1; i >= 0; i--) {
+    const e = targets[i]; e.t++;
+    if (e.flash > 0) e.flash--;
+    if (e.dead) {
+      if (e.type==='heli'||e.type==='jet') {
+        e.vy += .14; e.y += e.vy; e.x += e.vx; e.rot += .1;
+        if (frame % 3 === 0) smoke(e.x, e.y);
+        if (e.y >= GY-8) { snd('boom'); boom(e.x, GY-10, 18, '#ff9e40'); targets.splice(i,1); }
+      } else if (e.wreck) {
+        e.wreck--; if (frame % 6 === 0) smoke(e.x, e.y - 16);
+        if (frame % 9 === 0) parts.push({x:e.x+rand(-14,14), y:e.y-10, vx:0, vy:rand(-1,-.5), g:0, life:14, max:14, col:'#ff8c42', sz:3});
+        if (e.wreck <= 0) targets.splice(i,1);
+      } else { if (!e.rmT) e.rmT = 26; e.rmT--; if (e.rmT <= 0 || e.rm) targets.splice(i,1); }
+      continue;
+    }
+    if (e.type === 'board') { if (e.pop > 0) e.pop--; e.ttl--; if (e.ttl <= 0) { targets.splice(i,1); } }
+    else if (e.type==='soldier'||e.type==='civ') { e.x += e.dir*e.sp; }
+    else if (e.type==='heli') { e.x += e.dir*e.sp; e.yb = Math.sin(e.t*.06)*4; }
+    else { e.x += e.dir*e.sp; }
+    if (e.x < -80 || e.x > W+80) { targets.splice(i,1); continue; }
+    if (e.atk && e.x > 30 && e.x < W-30) {
+      e.atk--;
+      if (e.atk === 36) e.tele = 36;
+      if (e.tele > 0) { e.tele--; if (e.tele === 0) {
+        const sp = SPEC[e.type];
+        parts.push({x:e.x, y:cyOf(e), vx:0, vy:0, g:0, life:8, max:8, col:'#ffd166', sz:5, puff:1});
+        dmgPlayer(sp.dmg); e.atk = Math.floor(rand(sp.atk*.7, sp.atk*1.2));
+      }}
+    }
+  }
+  for (let i = parts.length-1; i >= 0; i--) {
+    const p = parts[i]; p.life--;
+    if (!p.ring && !p.puff) { p.x += p.vx; p.y += p.vy; p.vy += p.g; }
+    if (p.life <= 0) parts.splice(i,1);
+  }
+  if (shake > 0) shake--;
+  if (redF > 0) redF--;
+}
+
+function seedR(i, j) { const v = Math.sin(i*127.1 + j*311.7) * 43758.5; return v - Math.floor(v); }
+
+function drawWorld(g) {
+  const th = THEMES[MISSIONS[mi].theme];
+  g.fillStyle = th.sky; g.fillRect(-40, -40, W+80, H+80);
+  const tm = MISSIONS[mi].theme;
+  if (tm === 6) { g.fillStyle = '#e8e4d0'; g.beginPath(); g.arc(540, 70, 26, 0, 6.28); g.fill();
+    g.fillStyle = th.sky; g.beginPath(); g.arc(552, 62, 24, 0, 6.28); g.fill(); }
+  g.fillStyle = th.far;
+  g.beginPath(); g.moveTo(-40, 250);
+  for (let x = 0; x <= W+40; x += 40) g.lineTo(x, 250 - seedR(x,1)*70 - (tm===5?50:0));
+  g.lineTo(W+40, 320); g.closePath(); g.fill();
+  g.fillStyle = th.near;
+  g.beginPath(); g.moveTo(-40, 310);
+  for (let x = 0; x <= W+40; x += 55) g.lineTo(x, 310 - seedR(x,2)*46);
+  g.lineTo(W+40, 360); g.closePath(); g.fill();
+  g.fillStyle = th.gnd; g.fillRect(-40, GY-28, W+80, H-GY+70);
+  if (tm === 1 || tm === 6) {
+    for (let i = 0; i < 7; i++) {
+      const bx = i*100 + seedR(i,3)*40, bw = 46 + seedR(i,4)*34, bh = 70 + seedR(i,5)*90;
+      g.fillStyle = tm===6 ? '#141828' : '#565f6b';
+      g.fillRect(bx, GY-28-bh, bw, bh);
+      g.fillStyle = tm===6 ? 'rgba(255,209,102,.6)' : 'rgba(230,240,250,.5)';
+      for (let wy = 0; wy < Math.floor(bh/22); wy++) for (let wx = 0; wx < Math.floor(bw/16); wx++)
+        if (seedR(i*13+wx, wy) > .45) g.fillRect(bx+5+wx*16, GY-38-bh+14+wy*22, 6, 8);
+    }
+  } else if (tm === 0 || tm === 3) {
+    for (let i = 0; i < 8; i++) {
+      const px = i*90 + seedR(i,6)*50, ph = 26 + seedR(i,7)*22;
+      g.fillStyle = tm===3 ? '#2f5443' : '#2e5b3a';
+      g.beginPath(); g.moveTo(px, GY-24); g.lineTo(px+11, GY-24-ph); g.lineTo(px+22, GY-24); g.closePath(); g.fill();
+      if (tm===3) { g.fillStyle = '#eef4f8'; g.beginPath(); g.moveTo(px+4, GY-28-ph*.6); g.lineTo(px+11, GY-24-ph); g.lineTo(px+18, GY-28-ph*.6); g.closePath(); g.fill(); }
+    }
+  } else if (tm === 2) {
+    g.fillStyle = '#8a6134';
+    for (let i = 0; i < 6; i++) { const cx = i*120 + seedR(i,8)*60; g.fillRect(cx, GY-46, 8, 20); g.fillRect(cx-6, GY-40, 20, 6); }
+    g.fillStyle = 'rgba(60,40,20,.25)'; g.fillRect(-40, GY-6, W+80, 12);
+  } else if (tm === 4) {
+    g.fillStyle = 'rgba(255,255,255,.35)';
+    for (let i = 0; i < 10; i++) g.fillRect((i*70 + frame*.4) % (W+60) - 30, GY - 20 + seedR(i,9)*30, 26, 2);
+  }
+  for (const e of targets) drawTarget(g, e);
+  for (const p of parts) {
+    const a = p.life / p.max;
+    if (p.ring) { g.globalAlpha = a*.8; g.strokeStyle = p.col; g.lineWidth = 3;
+      g.beginPath(); g.arc(p.x, p.y, (1-a)*30+5, 0, 6.28); g.stroke(); g.globalAlpha = 1; }
+    else { g.globalAlpha = Math.min(1, a*1.4); g.fillStyle = p.col;
+      g.fillRect(p.x-p.sz/2, p.y-p.sz/2, p.sz, p.sz); g.globalAlpha = 1; }
+  }
+}
+
+function drawTarget(g, e) {
+  const sp = SPEC[e.type];
+  g.save(); g.translate(e.x, (e.type==='heli') ? e.y + (e.yb||0) : e.y);
+  if (e.dead && (e.type==='heli'||e.type==='jet')) g.rotate(e.rot);
+  if (e.flash > 0) { g.globalAlpha = .55; }
+  if (e.tele > 0 && Math.floor(e.tele/5) % 2 === 0) {
+    g.strokeStyle = '#ff4d5e'; g.lineWidth = 2;
+    g.strokeRect(-sp.w/2-4, (e.type==='heli'||e.type==='jet' ? -sp.h/2 : -sp.h)-4, sp.w+8, sp.h+8);
+  }
+  const t = e.type;
+  if (t === 'board') {
+    const s = e.pop > 0 ? 1 - e.pop/20 : 1; g.scale(s, s);
+    g.fillStyle = '#7a5c3a'; g.fillRect(-3, -22, 6, 22);
+    g.fillStyle = '#f0e6d2'; g.beginPath(); g.arc(0, -32, 15, 0, 6.28); g.fill();
+    g.fillStyle = '#d84a4a'; g.beginPath(); g.arc(0, -32, 10, 0, 6.28); g.fill();
+    g.fillStyle = '#f0e6d2'; g.beginPath(); g.arc(0, -32, 5.5, 0, 6.28); g.fill();
+    g.fillStyle = '#d84a4a'; g.beginPath(); g.arc(0, -32, 2.2, 0, 6.28); g.fill();
+  } else if (t === 'soldier' || t === 'civ') {
+    if (e.dead) { g.rotate(e.dir * (1 - (e.rmT||26)/26) * 1.5); }
+    const uni = t==='soldier' ? '#5b6d3e' : '#d8d5ce';
+    g.fillStyle = '#c9a381'; g.beginPath(); g.arc(0, -30, 4.4, 0, 6.28); g.fill();
+    if (t==='soldier'){ g.fillStyle='#3f4d2a'; g.fillRect(-5,-36,10,4); }
+    g.fillStyle = uni; g.fillRect(-5, -26, 10, 14);
+    g.fillStyle = t==='soldier' ? '#42502e' : '#8f8c85';
+    const leg = Math.sin(e.t*.25)*3;
+    g.fillRect(-4.5, -12, 4, 12+leg*.4); g.fillRect(.5, -12, 4, 12-leg*.4);
+    if (t==='soldier') { g.strokeStyle = '#2c2c2a'; g.lineWidth = 2.4;
+      g.beginPath(); g.moveTo(-e.dir*4, -22); g.lineTo(e.dir*9, -25); g.stroke(); }
+  } else if (t === 'jeep') {
+    g.fillStyle = e.dead ? '#3a3a38' : '#5d6b45';
+    g.fillRect(-26, -20, 52, 13);
+    g.fillRect(-12, -27, 22, 8);
+    g.fillStyle = e.dead ? '#222' : '#b9c8d6'; g.fillRect(-9, -26, 8, 6);
+    g.fillStyle = '#23241f';
+    g.beginPath(); g.arc(-15, -6, 6.5, 0, 6.28); g.arc(15, -6, 6.5, 0, 6.28); g.fill();
+  } else if (t === 'truck') {
+    g.fillStyle = e.dead ? '#3a3a38' : '#6b6148';
+    g.fillRect(-36, -26, 46, 19);
+    g.fillStyle = e.dead ? '#333' : '#55604a'; g.fillRect(12, -24, 24, 17);
+    g.fillStyle = e.dead ? '#222' : '#b9c8d6'; g.fillRect(26, -22, 8, 6);
+    g.fillStyle = '#23241f';
+    g.beginPath(); g.arc(-24, -6, 6.5, 0, 6.28); g.arc(-4, -6, 6.5, 0, 6.28); g.arc(22, -6, 6.5, 0, 6.28); g.fill();
+  } else if (t === 'tank') {
+    g.fillStyle = e.dead ? '#33332f' : '#4f5b3a';
+    g.fillRect(-32, -22, 64, 12);
+    g.fillStyle = '#2c2f24';
+    g.beginPath();
+    g.moveTo(-34, -10); g.lineTo(34, -10); g.lineTo(28, -2); g.lineTo(-28, -2); g.closePath(); g.fill();
+    g.fillStyle = '#3a4229';
+    for (let wx = -26; wx <= 26; wx += 10) { g.beginPath(); g.arc(wx, -6.5, 3.4, 0, 6.28); g.fill(); }
+    g.fillStyle = e.dead ? '#3d3d38' : '#5a6844';
+    g.fillRect(-12, -30, 24, 10);
+    g.fillRect(e.dir > 0 ? 10 : -36, -27, 26, 4);
+  } else if (t === 'heli') {
+    g.fillStyle = e.dead ? '#3d3a36' : '#5f6a52';
+    g.beginPath(); g.ellipse(0, 0, 15, 9, 0, 0, 6.28); g.fill();
+    g.fillRect(e.dir > 0 ? -32 : 10, -2.5, 22, 5);
+    g.fillStyle = '#39412f'; g.beginPath(); g.arc(-e.dir*32, 0, 4.5, 0, 6.28); g.fill();
+    g.fillStyle = 'rgba(190,225,245,.9)'; g.fillRect(e.dir > 0 ? 5 : -11, -4, 6, 6);
+    g.strokeStyle = 'rgba(230,230,230,.8)'; g.lineWidth = 2;
+    const ra = e.t * .7;
+    g.beginPath(); g.moveTo(Math.cos(ra)*21, -9); g.lineTo(-Math.cos(ra)*21, -9); g.stroke();
+  } else if (t === 'jet') {
+    g.fillStyle = e.dead ? '#3d3a36' : '#7d8b99';
+    g.beginPath();
+    g.moveTo(e.dir*26, 0); g.lineTo(-e.dir*22, -5); g.lineTo(-e.dir*26, 0); g.lineTo(-e.dir*22, 5); g.closePath(); g.fill();
+    g.beginPath();
+    g.moveTo(e.dir*2, 0); g.lineTo(-e.dir*14, -11); g.lineTo(-e.dir*16, 0); g.lineTo(-e.dir*14, 11); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(190,225,245,.9)'; g.beginPath(); g.arc(e.dir*13, -1, 3, 0, 6.28); g.fill();
+    if (!e.dead) { g.fillStyle = '#ff8c42'; g.fillRect(-e.dir*30, -2, e.dir>0?-8:8, 4); }
+  }
+  g.globalAlpha = 1;
+  g.restore();
+}
+
+function draw() {
+  ctx.save();
+  if (shake > 0) ctx.translate(rand(-shake/2, shake/2), rand(-shake/2, shake/2));
+  drawWorld(ctx);
+  const swA = swayAmp();
+  const ix = aim.x + Math.sin(swT*.021)*swA + Math.sin(swT*.047)*swA*.6;
+  const iy = aim.y + Math.cos(swT*.026)*swA + Math.sin(swT*.039)*swA*.5;
+  const R = 116, z = zoomHi ? 4.2 : 2.2;
+  ctx.fillStyle = 'rgba(6,8,12,.55)';
+  ctx.beginPath(); ctx.rect(0,0,W,H); ctx.arc(aim.x, aim.y, R, 0, 6.28, true); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(aim.x, aim.y, R, 0, 6.28); ctx.clip();
+  ctx.translate(aim.x, aim.y); ctx.scale(z, z); ctx.translate(-aim.x, -aim.y);
+  drawWorld(ctx);
+  ctx.restore();
+  ctx.strokeStyle = '#0a0c10'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.arc(aim.x, aim.y, R+3, 0, 6.28); ctx.stroke();
+  ctx.strokeStyle = 'rgba(20,26,34,.9)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(aim.x-R, aim.y); ctx.lineTo(aim.x+R, aim.y);
+  ctx.moveTo(aim.x, aim.y-R); ctx.lineTo(aim.x, aim.y+R); ctx.stroke();
+  ctx.fillStyle = 'rgba(20,26,34,.9)';
+  for (let d = 22; d < R-8; d += 22) {
+    ctx.fillRect(aim.x+d-1, aim.y-3, 2, 6); ctx.fillRect(aim.x-d-1, aim.y-3, 2, 6);
+    ctx.fillRect(aim.x-3, aim.y+d-1, 6, 2); ctx.fillRect(aim.x-3, aim.y-d-1, 6, 2);
+  }
+  // Keep the red aim dot fixed at the exact center of the scope crosshair.
+  ctx.fillStyle = '#ff4d5e';
+  ctx.beginPath(); ctx.arc(aim.x, aim.y, 2.6, 0, 6.28); ctx.fill();
+  ctx.restore();
+  if (hitMarkT > 0 && hitMarkWorld) {
+    const hx = aim.x + (hitMarkWorld.x-aim.x)*z, hy = aim.y + (hitMarkWorld.y-aim.y)*z;
+    const k = hitMarkKill ? 10 : 7;
+    ctx.strokeStyle = hitMarkKill ? '#ff6b7a' : '#f7f4e8'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hx-k,hy-k); ctx.lineTo(hx-3,hy-3); ctx.moveTo(hx+k,hy-k); ctx.lineTo(hx+3,hy-3);
+    ctx.moveTo(hx-k,hy+k); ctx.lineTo(hx-3,hy+3); ctx.moveTo(hx+k,hy+k); ctx.lineTo(hx+3,hy+3); ctx.stroke();
+  }
+  if (flashT > 0) {
+    const grad = ctx.createRadialGradient(W*.82,H*.86,2,W*.82,H*.86,70);
+    grad.addColorStop(0,'rgba(255,240,170,.8)'); grad.addColorStop(.25,'rgba(255,145,55,.45)'); grad.addColorStop(1,'rgba(255,100,30,0)');
+    ctx.fillStyle=grad; ctx.fillRect(W*.68,H*.68,W*.3,H*.3);
+  }
+  if (redF > 0) { ctx.fillStyle = 'rgba(220,40,60,' + (redF/18*.4) + ')'; ctx.fillRect(0,0,W,H); }
+
+  const M = MISSIONS[mi];
+  ctx.textBaseline = 'top';
+  if (state === ST.PLAY) {
+    ctx.fillStyle = 'rgba(8,10,16,.72)'; ctx.fillRect(0, 0, W, 34);
+    ctx.fillStyle = '#e8ecf4'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('작전 ' + (mi+1) + ' — ' + M.name + '   격파 ' + kills + '/' + M.goal + '   점수 ' + score + (combo>1?'   COMBO×'+combo:''), 10, 10);
+    ctx.textAlign = 'right';
+    const s = Math.ceil(timeF/60);
+    ctx.fillStyle = s <= 10 ? '#ff6b7a' : '#e8ecf4';
+    ctx.fillText(Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'), W-10, 10);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(8,10,16,.72)'; ctx.fillRect(0, H-34, W, 34);
+    ctx.fillStyle = '#e8ecf4'; ctx.font = 'bold 12px monospace';
+    ctx.fillText('HP', 10, H-24);
+    ctx.fillStyle = '#2c3140'; ctx.fillRect(34, H-24, 110, 10);
+    ctx.fillStyle = hp > 35 ? '#5dca87' : '#ff6b7a'; ctx.fillRect(34, H-24, 110*hp/100, 10);
+    ctx.fillStyle = '#e8ecf4'; ctx.fillText('호흡', 158, H-24);
+    ctx.fillStyle = '#2c3140'; ctx.fillRect(192, H-24, 80, 10);
+    ctx.fillStyle = exhaust > 0 ? '#ff9e40' : '#7fb8e6'; ctx.fillRect(192, H-24, 80*breathM/100, 10);
+    if (reloadT > 0) { ctx.fillStyle = '#ffd166'; ctx.fillText('재장전 중...', 288, H-24); }
+    else { ctx.fillStyle = '#ffd166';
+      for (let i = 0; i < mag; i++) ctx.fillRect(288 + i*11, H-26, 7, 14); }
+    ctx.fillStyle = '#8a93a6'; ctx.textAlign = 'right';
+    ctx.fillText('Space 발사 · Z 줌 · Shift 숨 · R 장전 · P 정지 · M 음소거', W-10, H-24);
+    ctx.textAlign = 'left';
+    if (M.civ) { ctx.fillStyle = '#ff9e40'; ctx.fillText('민간인(흰옷) 오사 ' + civK + '/2', 10, 42); }
+    if (noticeT > 0) {
+      ctx.globalAlpha = Math.min(1, noticeT/12); ctx.textAlign='center'; ctx.font='bold 18px monospace'; ctx.fillStyle=noticeCol;
+      ctx.fillText(notice, W/2, 48); ctx.globalAlpha=1; ctx.textAlign='left';
+    }
+    if (paused) {
+      ctx.fillStyle='rgba(5,7,12,.74)'; ctx.fillRect(0,0,W,H);
+      ctx.textAlign='center'; ctx.font='bold 34px monospace'; ctx.fillStyle='#ffd166'; ctx.fillText('일시정지',W/2,180);
+      ctx.font='14px monospace'; ctx.fillStyle='#c6cddb'; ctx.fillText('P 또는 ▶ 버튼으로 계속',W/2,230); ctx.textAlign='left';
+    }
+  } else {
+    ctx.fillStyle = 'rgba(6,8,14,.82)'; ctx.fillRect(0,0,W,H);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#e8ecf4';
+    if (state === ST.BRIEF) {
+      ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#7fb8e6';
+      ctx.fillText('작전 ' + (mi+1) + ' / ' + MISSIONS.length + ' — ' + THEMES[M.theme].n, W/2, 130);
+      ctx.font = 'bold 30px monospace'; ctx.fillStyle = '#ffd166';
+      ctx.fillText(M.name, W/2, 158);
+      ctx.font = '14px monospace'; ctx.fillStyle = '#c6cddb';
+      M.brief.forEach((l, i) => ctx.fillText(l, W/2, 208 + i*24));
+      ctx.fillText('목표 ' + M.goal + '기 · 제한시간 ' + M.time + '초', W/2, 268);
+      const rec = records.missions[mi];
+      if (rec) { ctx.font='12px monospace'; ctx.fillStyle='#8a93a6'; ctx.fillText('최고 기록 ' + rec.score + '점 · 명중률 ' + rec.acc + '%', W/2, 292); }
+      ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#5dca87';
+      if (Math.floor(frame/30) % 2 === 0) ctx.fillText('▶ 클릭해서 작전 개시', W/2, 320);
+    } else if (state === ST.RESULT) {
+      ctx.font = 'bold 34px monospace';
+      ctx.fillStyle = resultOK ? '#5dca87' : '#ff6b7a';
+      ctx.fillText(resultOK ? '임무 완수' : '임무 실패', W/2, 130);
+      ctx.font = '14px monospace'; ctx.fillStyle = '#c6cddb';
+      ctx.fillText(resultMsg, W/2, 180);
+      const acc = shots ? Math.round(hits/shots*100) : 0;
+      ctx.fillText('점수 ' + score + ' · 명중률 ' + acc + '% (+' + Math.round(acc*3) + ' 보너스)', W/2, 210);
+      ctx.fillText('헤드샷 ' + headshots + ' · 최고 콤보 ' + bestCombo + ' · 누적 점수 ' + total, W/2, 236);
+      ctx.fillStyle='#8a93a6'; ctx.fillText('전체 최고 점수 ' + (records.bestTotal||0), W/2, 260);
+      ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#5dca87';
+      if (Math.floor(frame/30) % 2 === 0)
+        ctx.fillText(resultOK ? '▶ 클릭해서 다음 작전' : '▶ 클릭해서 재도전', W/2, 315);
+    } else {
+      ctx.font = 'bold 34px monospace'; ctx.fillStyle = '#ffd166';
+      ctx.fillText('전 작전 완수', W/2, 140);
+      ctx.font = '16px monospace'; ctx.fillStyle = '#c6cddb';
+      ctx.fillText('최종 점수 ' + total + '점', W/2, 196);
+      ctx.font='13px monospace'; ctx.fillStyle='#8a93a6'; ctx.fillText('전체 최고 점수 ' + records.bestTotal + '점', W/2, 224);
+      ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#5dca87';
+      if (Math.floor(frame/30) % 2 === 0) ctx.fillText('▶ 클릭해서 처음부터', W/2, 260);
+    }
+  }
+}
+
+function advance() {
+  if (state === ST.BRIEF) startMission();
+  else if (state === ST.RESULT) {
+    if (resultOK) { mi++; if (mi >= MISSIONS.length) state = ST.END; else state = ST.BRIEF; }
+    else state = ST.BRIEF;
+    updateUi();
+  } else if (state === ST.END) { mi = 0; total = 0; state = ST.BRIEF; updateUi(); }
+}
+
+function pos(ev) {
+  const r = cv.getBoundingClientRect();
+  return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
+}
+cv.addEventListener('mousemove', ev => {
+  const p = pos(ev); aim.x = clamp(p.x, 20, W-20); aim.y = clamp(p.y, 20, H-20);
+});
+cv.addEventListener('mousedown', ev => {
+  ev.preventDefault();
+  if (ev.button === 2) { zoomHi = !zoomHi; return; }
+  if (state === ST.PLAY) fire(); else advance();
+});
+cv.addEventListener('contextmenu', ev => ev.preventDefault());
+let tc = null;
+cv.addEventListener('touchstart', ev => {
+  ev.preventDefault();
+  const t = ev.changedTouches[0];
+  tc = { id: t.identifier, x: t.clientX, y: t.clientY, t: Date.now(), moved: 0 };
+}, {passive:false});
+cv.addEventListener('touchmove', ev => {
+  ev.preventDefault();
+  if (!tc) return;
+  const r = cv.getBoundingClientRect();
+  for (const t of ev.changedTouches) if (t.identifier === tc.id) {
+    const dx = (t.clientX - tc.x) / r.width * W, dy = (t.clientY - tc.y) / r.height * H;
+    tc.moved += Math.abs(dx) + Math.abs(dy);
+    const f = zoomHi ? .45 : .85;
+    aim.x = clamp(aim.x + dx*f, 20, W-20); aim.y = clamp(aim.y + dy*f, 20, H-20);
+    tc.x = t.clientX; tc.y = t.clientY;
+  }
+}, {passive:false});
+cv.addEventListener('touchend', ev => {
+  ev.preventDefault();
+  if (tc && Date.now() - tc.t < 240 && tc.moved < 14) {
+    if (state === ST.PLAY) fire(); else advance();
+  }
+  tc = null;
+}, {passive:false});
+window.addEventListener('keydown', ev => {
+  const k = ev.key.toLowerCase();
+  if (k === ' ') { ev.preventDefault(); if (state === ST.PLAY) fire(); else advance(); }
+  if (k === 'z') { zoomHi = !zoomHi; updateUi(); }
+  if (k === 'shift' && state===ST.PLAY && !paused && breathM > 8 && exhaust <= 0) { breathHeld = true; updateUi(); }
+  if (k === 'r' && state === ST.PLAY && !paused && mag < 5 && reloadT <= 0) reloadT = 95;
+  if ((k === 'p' || k === 'escape') && state===ST.PLAY) setPaused(!paused);
+  if (k === 'm') toggleMute();
+});
+window.addEventListener('keyup', ev => { if (ev.key === 'Shift') { breathHeld = false; updateUi(); } });
+window.addEventListener('blur', () => { if (state===ST.PLAY && !paused) setPaused(true); });
+
+ui.pause.addEventListener('click', ev => { ev.stopPropagation(); if(state===ST.PLAY) setPaused(!paused); });
+ui.mute.addEventListener('click', ev => { ev.stopPropagation(); toggleMute(); });
+ui.zoom.addEventListener('click', () => { zoomHi=!zoomHi; updateUi(); });
+ui.reload.addEventListener('click', () => { if(state===ST.PLAY && !paused && mag<5 && reloadT<=0) reloadT=95; });
+ui.fire.addEventListener('pointerdown', ev => { ev.preventDefault(); fire(); });
+const holdBreath = ev => { ev.preventDefault(); if(state===ST.PLAY && !paused && breathM>8 && exhaust<=0){ breathHeld=true; updateUi(); } };
+const releaseBreath = () => { breathHeld=false; updateUi(); };
+ui.breath.addEventListener('pointerdown', holdBreath);
+ui.breath.addEventListener('pointerup', releaseBreath);
+ui.breath.addEventListener('pointercancel', releaseBreath);
+ui.breath.addEventListener('pointerleave', releaseBreath);
+updateUi();
+
+(function loop(){ update(); draw(); requestAnimationFrame(loop); })();
+})();
+</script>
