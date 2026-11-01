@@ -127,6 +127,39 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;bac
 #verityReplay{pointer-events:auto;border:0;border-radius:14px;background:#198aff;color:white;padding:8px 18px;font-weight:900;cursor:pointer}
 @media(max-width:600px){#verityIntro{bottom:76px}#veritySpeech{padding:9px 12px}}
 
+
+  /* Nickname & local leaderboard */
+  .rankBox{margin-top:14px;padding:15px;border-radius:18px;background:#fff;border:2px solid #dce9f6}
+  .rankBox h3{margin:0 0 9px;font-size:18px;color:#183b60}
+  .nameField{display:flex;align-items:center;gap:9px;margin:10px 0}
+  .nameField label{font-weight:900;white-space:nowrap;color:#254660}
+  .nameField input{min-width:0;flex:1;padding:12px;border-radius:12px;border:2px solid #b8d3e8;background:#fff;color:#203c57;font-size:16px}
+  .rankTabs{display:flex;gap:6px;margin:9px 0}
+  .rankTabs button{flex:1;border:0;padding:8px 4px;border-radius:9px;background:#e6eff9;color:#345875;font-weight:900;cursor:pointer}
+  .rankTabs button.active{background:#1684f5;color:#fff}
+  .rankList{padding:0;margin:0;list-style:none;max-height:240px;overflow:auto}
+  .rankList li{display:grid;grid-template-columns:36px minmax(0,1fr) 62px;gap:7px;align-items:center;padding:9px 10px;border-bottom:1px solid #e7eef7;font-size:14px;font-weight:800}
+  .rankList li.mine{border-radius:9px;background:#d8edff;color:#0967c1}
+  .rankList .rankName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+  .rankList .rankPoints{text-align:right;font-variant-numeric:tabular-nums;color:#117ce0}
+  .rankNote{font-size:12px;color:#668097;margin:8px 0 0;line-height:1.45}
+  #gameOver .rankBox{text-align:left}
+  #rankResult{font-size:15px;font-weight:900;color:#176ec6;margin:8px 0}
+
+/* Multiplayer UI */
+#multiBox{margin-top:15px;padding:16px;border-radius:19px;background:#dae9fa;border:2px solid #b0caeb;color:#233b5d}
+#multiBox h3{margin:0 0 10px}#multiBox .modeRow{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+#multiBox button,.multiPanel button{border:0;border-radius:12px;background:#246dde;color:white;padding:11px 7px;font-weight:900;cursor:pointer}
+#multiBox .modeRow button{background:#a8c7e8;color:#244567}#multiBox .modeRow button.active{background:#1679ec;color:white}
+#multiBox input,.multiPanel input{width:100%;padding:12px;border-radius:11px;border:2px solid #b8c9dd;background:white;color:#173451}
+#multiBox .codeLine{display:flex;gap:8px;margin-top:8px}#multiBox .codeLine input{flex:1;min-width:0}
+#multiBox .codeLine button{min-width:96px}#multiStatus{font-size:13px;margin-top:11px;font-weight:850;white-space:pre-line;line-height:1.5}
+#multiRoom{display:none;position:fixed;z-index:17;inset:0;background:#102037be;align-items:center;justify-content:center}
+#multiRoom.show{display:flex}.multiPanel{max-width:430px;width:92vw;background:#eef6ff;border-radius:25px;padding:22px;text-align:center;color:#213b56}
+#multiRoomCode{font-size:34px;font-weight:1000;letter-spacing:6px;color:#126dd6}#multiRoomInfo{white-space:pre-line;line-height:1.7;margin:12px 0}
+#multiHUD{display:none;position:fixed;z-index:6;left:50%;top:7px;transform:translateX(-50%);background:#0c2441df;color:white;border-radius:15px;padding:8px 15px;font-weight:950;text-align:center;pointer-events:none;white-space:nowrap;font-size:13px}
+#multiHUD.show{display:block}#multiResult{display:none;margin-top:12px;padding:12px;border-radius:12px;background:#d4e9ff;color:#1b4871;font-weight:900}
+@media(max-width:600px){#multiBox .modeRow{grid-template-columns:1fr 1fr 1fr}#multiHUD{top:5px;font-size:11px}#multiRoomCode{font-size:25px}}
 </style>
 </head>
 <body>
@@ -181,7 +214,25 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;bac
       <button class="bigBtn" id="defaultBtn">기본색</button>
       <button class="bigBtn" id="startBtn">완료</button>
     </div>
-    <div class="difficultyBox">
+
+    <section class="rankBox" aria-label="플레이어 닉네임과 순위">
+      <h3>🏆 STEP BALL 랭킹 TOP 10</h3>
+      <div class="nameField"><label for="playerNickname">닉네임</label><input id="playerNickname" type="text" maxlength="16" placeholder="닉네임을 입력하세요" autocomplete="nickname"></div>
+      <div id="menuRankTabs" class="rankTabs"></div>
+      <ol id="menuRankList" class="rankList"></ol>
+      <p class="rankNote">난이도별 랭킹 · 잘난 척 모드는 순위에서 제외 · 이 브라우저에만 저장됩니다.</p>
+    </section>
+    
+<div id="multiBox">
+  <h3>🌐 온라인 1 vs 1</h3>
+  <div class="modeRow"><button type="button" class="active" data-mode="solo">혼자 하기</button><button type="button" data-mode="friend">친구 초대</button><button type="button" data-mode="random">랜덤 매칭</button></div>
+  <div id="multiFriend" style="display:none"><div class="codeLine"><button id="createRoom" type="button">방 만들기</button><input id="joinCode" maxlength="6" placeholder="6자리 방 코드"><button type="button" id="joinRoom">입장</button></div></div>
+  <div id="multiRandom" style="display:none"><button id="findRival" type="button" style="width:100%;margin-top:10px">⚡ 상대 찾기</button></div>
+  <div id="multiStatus">혼자 하기: 기존 게임과 로컬 랭킹을 이용해요.</div>
+  <small style="display:block;margin-top:7px;color:#66809b">온라인 대결을 사용하려면 Firebase 프로젝트 설정이 필요해요.</small>
+  <details style="margin-top:10px"><summary style="font-size:12px;cursor:pointer">⚙️ Firebase 연결 설정 (자동 입력 완료)</summary><textarea id="firebaseConfigInput" rows="5" spellcheck="false" style="width:100%;margin-top:8px;font-size:12px;border-radius:10px;padding:9px" placeholder='Firebase 웹 앱 설정 JSON: {"apiKey":"...", "authDomain":"...", "databaseURL":"...", "projectId":"...", "appId":"..."}'></textarea><button id="saveFirebase" type="button" style="margin-top:7px">연결 정보 저장</button></details>
+</div>
+<div class="difficultyBox">
       <label for="difficulty">🎯 난이도 선택</label>
       <select id="difficulty"><option value="easy">🟢 쉬움 — 천천히 움직이고 정답 표시</option><option value="normal" selected>🔵 보통 — 기본 속도와 정답 표시</option><option value="hard">🔴 어려움 — 칸마다 줄어드는 타임어택</option></select>
       <div id="difficultyDesc">보통: 기본 점프 속도 · 다음 방향 표시</div>
@@ -213,7 +264,14 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;bac
   <div class="card">
     <h2>와장창!</h2>
     <div id="finalScore">0000</div>
-    <p id="resultText">공이 계단에서 떨어져 깨졌어요.</p>
+    <p id="resultText">공이 계단에서 떨어져 깨졌어요.</p><div id="multiResult"></div>
+    <div id="rankResult" aria-live="polite"></div>
+    <section class="rankBox" aria-label="게임 종료 랭킹">
+      <h3>🏆 TOP 10</h3>
+      <div id="overRankTabs" class="rankTabs"></div>
+      <ol id="overRankList" class="rankList"></ol>
+    </section>
+
     <div class="gameActions">
       <button class="smallBtn" id="backMenuBtn">메뉴</button>
       <button class="smallBtn" id="restartBtn">다시 시작</button>
@@ -221,6 +279,8 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;bac
   </div>
 </div>
 
+<div id="multiRoom"><div class="multiPanel"><h2>⚔️ 온라인 대결</h2><div id="multiRoomCode">------</div><p id="multiRoomInfo">방을 준비하는 중...</p><button id="readyMulti" type="button">✅ 준비 완료</button> <button id="copyRoom" type="button">📋 방 코드 복사</button><button id="leaveMulti" style="display:block;width:100%;margin-top:12px;background:#6e879d" type="button">나가기</button></div></div>
+<div id="multiHUD"><span id="multiScoreLine">상대 연결 중...</span></div>
 <div id="verityIntro" aria-live="polite"><div id="verityName">🤖 VERITY</div><div id="veritySpeech">HELLO! I'm Verity! Your personal helper friend.
 Ask me anything! I'll know everything!</div><button id="verityReplay" type="button">🔊 음성 다시 듣기</button></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js"}}</script>
@@ -350,7 +410,10 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   // Infinite track: generate ahead and retire old geometry without ever resetting the score.
   let trackLane = 2, trackRow = 0, trackSide = -1, previousAxis = 'z';
   let trackCreated = 0, trackRetired = 0;
+  let matchSeed = 123456789, trackRng = matchSeed;
+  function trackRandom(){trackRng=(Math.imul(trackRng,1664525)+1013904223)>>>0;return trackRng/4294967296;}
   function buildTrack(count = 100){
+    trackRng=matchSeed>>>0;
     clearGroup(stairGroup);
     stepData.length = 0;
     trackLane=2; trackRow=0; trackSide=-1; previousAxis='z';
@@ -388,10 +451,10 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       stepData.push({laneIndex:trackLane,top,z,x,base,cap,isBonus,isPrism});
       const mustForward=trackLane+trackSide<0||trackLane+trackSide>=laneCount;
       // Mixed runs, turns, and zigzags, all reachable by exactly one key.
-      const forward=mustForward || (previousAxis==='x' ? Math.random()<.45 : Math.random()<.34);
+      const forward=mustForward || (previousAxis==='x' ? trackRandom()<.45 : trackRandom()<.34);
       if(forward){
         trackRow++; previousAxis='z';
-        if(mustForward||Math.random()<.32) trackSide*=-1;
+        if(mustForward||trackRandom()<.32) trackSide*=-1;
       } else {
         trackLane+=trackSide; previousAxis='x';
       }
@@ -1020,7 +1083,10 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   const hintEl = document.getElementById('hint');
   const speedMap = {easy:0.40,normal:0.23,hard:0.15};
   const descMap = {easy:'쉬움: 점프가 느려서 따라가기 쉬워요 · 방향 표시',normal:'보통: 기본 점프 속도 · 다음 방향 표시',hard:'어려움: 칸마다 제한시간이 있고, 올라갈수록 줄어들어요 · 방향 숨김'};
-  difficultySelect.addEventListener('change',()=>{difficultyDesc.textContent=descMap[difficultySelect.value]});
+  difficultySelect.addEventListener('change',()=>{
+    difficultyDesc.textContent=descMap[difficultySelect.value];
+    if(difficultySelect.value==='hard') document.getElementById('cheatMode').checked=false;
+  });
   let helpOpen = false;
   helpBtn.onclick=()=>{helpOpen=true;helpOverlay.classList.add('show')};
   document.getElementById('closeHelp').onclick=()=>{helpOpen=false;helpOverlay.classList.remove('show')};
@@ -1032,7 +1098,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   const HARD_DECREASE_PER_STEP=0.035;
   const HARD_MIN_SECONDS=0.62;
   let timeLimit=HARD_INITIAL_SECONDS, timeRemaining=HARD_INITIAL_SECONDS;
-  function hardMode(){return difficultySelect.value === 'hard' && !cheatModeInput.checked;}
+  function hardMode(){return difficultySelect.value === 'hard';}
   function resetHardTimer(){
     timeLimit=Math.max(HARD_MIN_SECONDS,HARD_INITIAL_SECONDS-stepIndex*HARD_DECREASE_PER_STEP);
     timeRemaining=timeLimit;
@@ -1069,6 +1135,90 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     tone(880,.15,'triangle',.07);
   }
 
+
+  const RANK_KEY = 'stepBall3D_rank_v1';
+  const NAME_KEY = 'stepBall3D_nickname';
+  const playerNickname = document.getElementById('playerNickname');
+  const difficultyLabels = {easy:'쉬움',normal:'보통',hard:'어려움'};
+  let rankingTab = 'normal';
+  let resultTab = 'normal';
+  let activePlayerName = '';
+  let activeDifficulty = 'normal';
+  let activeCheat = false;
+  let rankSaved = false;
+  function readRanks(){
+    try {
+      const data = JSON.parse(localStorage.getItem(RANK_KEY) || '{}');
+      return data && typeof data==='object' && !Array.isArray(data) ? data : {};
+    }catch(e){return {};}
+  }
+  function writeRanks(data){try{localStorage.setItem(RANK_KEY,JSON.stringify(data));}catch(e){}}
+  function safeName(raw){return String(raw||'').trim().replace(/\\s+/g,' ').slice(0,16) || '익명 플레이어';}
+  try{playerNickname.value=localStorage.getItem(NAME_KEY)||'';}catch(e){}
+  function renderRanking(which, diff){
+    const tabs = document.getElementById(which==='menu'?'menuRankTabs':'overRankTabs');
+    const list = document.getElementById(which==='menu'?'menuRankList':'overRankList');
+    tabs.replaceChildren();
+    Object.keys(difficultyLabels).forEach(key=>{
+      const btn=document.createElement('button');
+      btn.type='button';btn.textContent=difficultyLabels[key];
+      btn.className=key===diff?'active':'';
+      btn.onclick=()=>{
+        if(which==='menu')rankingTab=key;else resultTab=key;
+        renderRanking(which,key);
+      };
+      tabs.appendChild(btn);
+    });
+    list.replaceChildren();
+    const rows = (readRanks()[diff] || []).slice(0,10);
+    if(!rows.length){
+      const empty=document.createElement('li');
+      empty.style.display='block';empty.textContent='아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!';
+      list.appendChild(empty);return;
+    }
+    rows.forEach((entry,i)=>{
+      const item=document.createElement('li');
+      if(which==='over' && entry.id === lastRankId) item.className='mine';
+      const no=document.createElement('span');no.textContent=i<3?['🥇','🥈','🥉'][i]:String(i+1)+'위';
+      const name=document.createElement('span');name.className='rankName';name.textContent=entry.name;
+      const points=document.createElement('span');points.className='rankPoints';points.textContent=Number(entry.score).toLocaleString();
+      item.append(no,name,points);list.appendChild(item);
+    });
+  }
+  let lastRankId='';
+  function saveFinalRanking(points){
+    if(rankSaved)return;
+    rankSaved=true;
+    const msg=document.getElementById('rankResult');
+    resultTab=activeDifficulty;
+    lastRankId='';
+    if(multi.mode!=='solo'){
+      msg.textContent='⚔️ 온라인 대결 기록은 싱글 랭킹에 등록하지 않아요.';
+    }else if(activeCheat){
+      msg.textContent='😎 잘난 척 모드는 순위에 등록되지 않아요.';
+    }else{
+      const data=readRanks();
+      const list=Array.isArray(data[activeDifficulty])?data[activeDifficulty]:[];
+      const id=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+      list.push({id,name:activePlayerName,score:Math.max(0,Math.floor(points))});
+      list.sort((a,b)=>b.score-a.score);
+      const place=list.findIndex(e=>e.id===id)+1;
+      data[activeDifficulty]=list.slice(0,10);
+      writeRanks(data);
+      lastRankId=id;
+      msg.textContent=place<=10?`🎉 ${activePlayerName} · ${difficultyLabels[activeDifficulty]} ${place}위 달성!`:`${activePlayerName} · 이번 기록은 TOP 10 밖이에요. 다시 도전!`;
+    }
+    renderRanking('over',resultTab);
+    renderRanking('menu',rankingTab);
+  }
+  playerNickname.addEventListener('change',()=>{
+    playerNickname.value=safeName(playerNickname.value);
+    try{localStorage.setItem(NAME_KEY,playerNickname.value);}catch(e){}
+  });
+  document.getElementById('difficulty').addEventListener('change',e=>{
+    rankingTab=e.target.value;renderRanking('menu',rankingTab);
+  });
+  renderRanking('menu',rankingTab);
   let pendingMove = 0;
   let best = Number(localStorage.getItem('stepBall3D_best') || 0);
   bestEl.textContent = String(best).padStart(4,'0');
@@ -1081,7 +1231,146 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   }
 
   const ready = document.getElementById('ready');
+
+  const multi = (() => {
+    const $=id=>document.getElementById(id);
+    const box=$('multiBox'), lobby=$('multiRoom'), hud=$('multiHUD'), info=$('multiRoomInfo');
+    const statusEl=$('multiStatus');
+    const ghost=new THREE.Mesh(new THREE.SphereGeometry(ballRadius,.0+32,24),new THREE.MeshPhongMaterial({color:0x48caff,transparent:true,opacity:.38,depthWrite:false,emissive:0x1177cc,emissiveIntensity:.34}));
+    ghost.visible=false;ghost.renderOrder=4;scene.add(ghost);
+    let api=null, app=null, db=null, auth=null, uid='', room='', unsub=null, activeRoom=null, lastSend=0, lastSeen=0, role='', mode='solo', started=false, localReady=false, opponent=null, opPos=null, opDead=false, mineDead=false, countdownQueued=false, lastResult='';
+    const CONFIG_KEY='stepball_firebase_web_config';
+    const DEFAULT_FIREBASE_CONFIG = {"apiKey":"AIzaSyB9WH1JZg4ggtRAtPlCqhC17--BuXu8uX8","authDomain":"stepball-arcade.firebaseapp.com","databaseURL":"https://stepball-arcade-default-rtdb.asia-southeast1.firebasedatabase.app","projectId":"stepball-arcade","storageBucket":"stepball-arcade.firebasestorage.app","messagingSenderId":"718818704633","appId":"1:718818704633:web:e04767945d3ec901da7628","measurementId":"G-DNSVKSDGC5"};
+    $('firebaseConfigInput').value=localStorage.getItem(CONFIG_KEY)||JSON.stringify(DEFAULT_FIREBASE_CONFIG,null,2);
+    function status(t){statusEl.textContent=t;}
+    function setting(){try{const c=JSON.parse($('firebaseConfigInput').value.trim());if(!c.apiKey||!c.databaseURL||!c.projectId||!c.appId)throw Error('필수 항목 누락');return c;}catch(e){throw Error('Firebase 웹 앱 JSON 설정을 확인해 주세요.');}}
+    async function connect(){
+      if(db)return;
+      const config=setting();
+      const [{initializeApp},{getDatabase,ref,set,get,update,onValue,runTransaction,onDisconnect,remove},{getAuth,signInAnonymously}]=await Promise.all([
+        import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),
+        import('https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js'),
+        import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js')
+      ]).then(([fa,fd,fu])=>[fa,fd,fu]);
+      api={ref,set,get,update,onValue,runTransaction,onDisconnect,remove};
+      app=initializeApp(config,'stepball-multiplayer');db=getDatabase(app);auth=getAuth(app);
+      const cred=await signInAnonymously(auth);uid=cred.user.uid;
+    }
+    function key(){return Math.random().toString(36).substring(2,8).toUpperCase().padEnd(6,'X');}
+    function url(path){return api.ref(db,path);}
+    function name(){return safeName(playerNickname.value);}
+    function difficulty(){return difficultySelect.value;}
+    function statusError(e){const msg=(e&&e.message)||String(e);status('⚠️ '+msg);info.textContent='⚠️ '+msg;}
+    function showRoom(){lobby.classList.add('show');$('multiRoomCode').textContent=room;$('readyMulti').disabled=false;$('readyMulti').textContent='✅ 준비 완료';}
+    async function createRoom(forRandom=false){
+      await connect(); await leave(false);
+      const code=key();room=code;role='host';started=false;localReady=false;mineDead=false;opDead=false;countdownQueued=false;
+      matchSeed=(Math.random()*4294967295)>>>0;
+      const data={seed:matchSeed,difficulty:difficulty(),state:'waiting',createdAt:Date.now(),host:{uid,name:name(),score:0,ready:false,dead:false,connected:true}};
+      await api.set(url('rooms/'+code),data);
+      await api.onDisconnect(url('rooms/'+code+'/host/connected')).set(false);
+      showRoom();watchRoom();
+      if(forRandom){
+        const q=url('queue/'+difficulty());
+        const tx=await api.runTransaction(q,current=>current && Date.now()-current.createdAt<120000 ? undefined : {room:code,uid,createdAt:Date.now()});
+        if(!tx.committed){
+          const other=tx.snapshot.val();
+          if(other && other.room!==code){await api.remove(url('rooms/'+code));room='';return await joinRoom(other.room,true);}
+        }
+      }
+      status(forRandom?'🔎 상대를 기다리고 있어요.':'🎟 친구에게 방 코드를 알려주세요.');
+    }
+    async function joinRoom(code,forRandom=false){
+      await connect();await leave(false);
+      code=String(code||'').trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(code))throw Error('6자리 방 코드를 입력해 주세요.');
+      const roomRef=url('rooms/'+code);
+      const tx=await api.runTransaction(roomRef,v=>{
+        if(!v||v.guest||v.host?.uid===uid||v.state!=='waiting'||v.difficulty!==difficulty()||Date.now()-v.createdAt>600000)return;
+        v.guest={uid,name:name(),score:0,ready:false,dead:false,connected:true};return v;
+      });
+      if(!tx.committed)throw Error('방이 없거나 이미 시작했어요. 같은 난이도인지 확인해 주세요.');
+      room=code;role='guest';started=false;localReady=false;mineDead=false;opDead=false;countdownQueued=false;matchSeed=tx.snapshot.val().seed>>>0;
+      await api.onDisconnect(url('rooms/'+room+'/guest/connected')).set(false);
+      showRoom();watchRoom();status(forRandom?'✅ 랜덤 매칭 성공!':'✅ 친구 방에 입장했어요.');
+    }
+    function watchRoom(){
+      if(unsub)unsub();
+      unsub=api.onValue(url('rooms/'+room),snap=>{
+        const v=snap.val();if(!v){if(!started)statusError(Error('방이 종료됐어요.'));return;}
+        activeRoom=v;const other=role==='host'?v.guest:v.host;opponent=other||null;opDead=!!other?.dead;
+        if(v.seed!==undefined)matchSeed=v.seed>>>0;
+        info.textContent=`${v.host?.name||'호스트'} ${v.host?.ready?'✅':'⌛'}  VS  ${v.guest?.name||'상대 기다리는 중'} ${v.guest?.ready?'✅':'⌛'}\n난이도: ${difficultyLabels[v.difficulty]||v.difficulty}\n${v.guest?'두 사람 모두 준비 버튼을 누르세요.':'친구 초대 또는 랜덤 상대를 기다리는 중...'}`;
+        if(other && other.connected===false && !started)info.textContent+='\n⚠️ 상대가 연결을 종료했어요.';
+        if(role==='host'&&v.guest?.ready&&v.host?.ready&&v.state==='waiting'&&!countdownQueued){
+          countdownQueued=true;api.update(url('rooms/'+room),{state:'countdown',startAt:Date.now()+3400}).catch(statusError);
+          api.get(url('queue/'+v.difficulty)).then(q=>{if(q.val()?.room===room)api.remove(url('queue/'+v.difficulty));});
+        }
+        if(v.state==='countdown'&&!started&&!multiStartTimer){
+          const ms=Math.max(0,(v.startAt||Date.now()+3400)-Date.now());
+          info.textContent=`🚀 동시 출발! ${Math.ceil(ms/1000)}초 후 시작`;
+          multiStartTimer=setTimeout(()=>{
+            multiStartTimer=null;if(!room||started)return;
+            started=true;lobby.classList.remove('show');
+            startGame();
+          },ms);
+        }
+        if(started){
+          $('multiScoreLine').textContent=`🔵 ${name()} ${score}  ⚔️  ${other?.name||'상대'} ${other?.score||0}${opDead?' 💥':''}`;
+          if(other?.pos && Array.isArray(other.pos)){
+            opPos=new THREE.Vector3(...other.pos);lastSeen=performance.now();ghost.visible=!other.dead;
+          }
+          if(other?.dead && !mineDead){
+            lastResult='🏆 승리! 상대가 먼저 추락했어요.';showDuelResult(lastResult);
+          }
+          if(mineDead&&other?.dead){
+            const verdict=score>(other.score||0)?'🏆 승리':score<(other.score||0)?'패배':'🤝 무승부';
+            showDuelResult(`${verdict} · 나 ${score} / 상대 ${other.score||0}`);
+          }
+        }
+      },statusError);
+    }
+    let multiStartTimer=null;
+    function showDuelResult(txt){const r=$('multiResult');r.style.display='block';r.textContent=txt;}
+    async function leave(resetMode=false){
+      if(multiStartTimer){clearTimeout(multiStartTimer);multiStartTimer=null;}
+      if(unsub){unsub();unsub=null;}
+      const old=room,oldRole=role;room='';started=false;localReady=false;opponent=null;opPos=null;ghost.visible=false;hud.classList.remove('show');lobby.classList.remove('show');$('multiResult').style.display='none';
+      if(old&&db){try{await api.update(url('rooms/'+old+'/'+oldRole),{connected:false,ready:false});}catch(e){}}
+      if(resetMode){mode='solo';syncMode();}
+    }
+    async function readyUp(){if(!room)return;localReady=true;$('readyMulti').disabled=true;$('readyMulti').textContent='✅ 준비 완료 · 대기 중';await api.update(url('rooms/'+room+'/'+role),{ready:true});}
+    function syncMode(){document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('multiFriend').style.display=mode==='friend'?'block':'none';$('multiRandom').style.display=mode==='random'?'block':'none';if(mode==='solo')status('혼자 하기: 기존 게임과 로컬 랭킹을 이용해요.');else status(mode==='friend'?'친구에게 방 코드를 공유해 주세요.':'랜덤 매칭을 시작하면 같은 난이도의 상대를 찾아요.');}
+    document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=async()=>{await leave();mode=b.dataset.mode;syncMode();});
+    $('saveFirebase').onclick=()=>{try{setting();localStorage.setItem(CONFIG_KEY,$('firebaseConfigInput').value.trim());status('✅ 설정 저장 완료. 온라인 모드를 선택해 주세요.');}catch(e){statusError(e);}};
+    $('createRoom').onclick=()=>createRoom(false).catch(statusError);
+    $('joinRoom').onclick=()=>joinRoom($('joinCode').value).catch(statusError);
+    $('findRival').onclick=()=>createRoom(true).catch(statusError);
+    $('readyMulti').onclick=()=>readyUp().catch(statusError);
+    $('leaveMulti').onclick=()=>leave().then(()=>status('대기실에서 나왔어요.'));
+    $('copyRoom').onclick=async()=>{try{await navigator.clipboard.writeText(room);info.textContent+='\n📋 방 코드를 복사했어요.';}catch(e){info.textContent+='\n방 코드: '+room;}};
+    function onStart(){if(mode==='solo')return;hud.classList.add('show');ghost.visible=!!opponent;lastResult='';mineDead=false;api?.update(url('rooms/'+room+'/'+role),{score:0,dead:false,pos:[ballGroup.position.x,ballGroup.position.y,ballGroup.position.z]}).catch(()=>{});}
+    function onStep(points){if(started&&room)api.update(url('rooms/'+room+'/'+role),{score:points}).catch(()=>{});}
+    function onLose(points){if(started&&room){mineDead=true;api.update(url('rooms/'+room+'/'+role),{score:points,dead:true}).catch(()=>{});showDuelResult(opDead?`종료 · 나 ${points} / 상대 ${opponent?.score||0}`:'💥 추락했어요. 상대 기록 확인 중...');}}
+    function tick(now){if(!started||!room)return;
+      if(playing&&!lost&&now-lastSend>120){lastSend=now;api.update(url('rooms/'+room+'/'+role+'/pos'),[+ballGroup.position.x.toFixed(2),+ballGroup.position.y.toFixed(2),+ballGroup.position.z.toFixed(2)]).catch(()=>{});}
+      if(opPos){ghost.position.lerp(opPos,.23);ghost.visible=!opDead&&now-lastSeen<9000;}
+    }
+    return {get mode(){return mode;},get started(){return started;},status,leave,onStart,onStep,onLose,tick};
+  })();
+
   function startGame(){
+    if (multi.mode!=='solo' && !multi.started) { multi.status('온라인 대결은 두 플레이어가 모두 준비한 후 시작해요.');return; }
+    // Hard difficulty must always have a real countdown. Disable cheat before starting.
+    if (difficultySelect.value === 'hard' && document.getElementById('cheatMode').checked) {
+      document.getElementById('cheatMode').checked = false;
+    }
+    activePlayerName = safeName(playerNickname.value);
+    playerNickname.value=activePlayerName;
+    try{localStorage.setItem(NAME_KEY,activePlayerName);}catch(e){}
+    activeDifficulty=document.getElementById('difficulty').value;
+    activeCheat=document.getElementById('cheatMode').checked;
+    rankSaved=false;
+
     verityTransformed = false;
     verityRespawns = 0;
     pikachuTransformed = false;
@@ -1095,6 +1384,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     ball.visible = true;
     applyVisibleSkin();
     shadow.visible = true;
+    if (multi.mode==='solo') matchSeed=(Math.random()*4294967295)>>>0;
     buildTrack();
     assignDirections();
     stepDuration = speedMap[difficultySelect.value] || .23;
@@ -1121,12 +1411,14 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     helpBtn.classList.add('show');
     hud.classList.add('show');
     last = performance.now();
+    multi.onStart();
     tone(480, .08, 'sine', .03);
     if (selectedSkin === 'verity' && !verityTransformed) showVerity();
     else hideVerity();
   }
 
   function openMenu(){
+    multi.leave(false);
     restoreGrenadeTrack();
     hideVerity();
     paused=false; pauseOverlay.classList.remove('show');pauseBtn.classList.remove('show');milestoneToast.classList.remove('show');
@@ -1233,18 +1525,21 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       breakPieces.push({mesh:piece, half:size*.5, vel:new THREE.Vector3((Math.random()-0.5)*4.6,2.2+Math.random()*2.3,(Math.random()-0.5)*3.6), rot:new THREE.Vector3(Math.random()*8,Math.random()*8,Math.random()*8), settled:false, bounces:0});
     }
     finalScoreEl.textContent = String(score).padStart(4,'0');
+    saveFinalRanking(score);
+    multi.onLose(score);
     tone(170,.35,'sawtooth',.04);
     setTimeout(() => { gameOver.classList.add('show'); topMenuBtn.classList.remove('show'); }, 650);
   }
 
   function finishStep(){
     combo++;
-    const multi=Math.min(5,1+Math.floor(combo/10));
-    comboHud.textContent=`🔥 연속 ${combo} · x${multi}`;
+    const comboMultiplier=Math.min(5,1+Math.floor(combo/10));
+    comboHud.textContent=`🔥 연속 ${combo} · x${comboMultiplier}`;
     comboHud.style.transform='scale(1.15)';
     if(combo%10===0) showMilestone(`🔥 ${combo}연속 착지! 콤보 x${multi}`);
     if(stepIndex>0 && stepIndex%50===0) showMilestone(`🏁 ${stepIndex}칸 달성! 계속 올라가세요!`);
     score = stepIndex;
+    multi.onStep(score);
     scoreEl.textContent = String(score).padStart(4,'0');
     fill.style.width = ((score % 10) * 10) + '%';
     landEffectStart();
@@ -1297,6 +1592,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   document.getElementById('forwardMove').addEventListener('click', () => queueMove('up'));
   document.getElementById('rightMove').addEventListener('click', () => queueMove('right'));
   addEventListener('keydown', e => {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if (e.code==='Space' && !e.repeat) {e.preventDefault();grenadeExplode();return;}
     if ((e.key==='p'||e.key==='P') && !e.repeat && playing) {setPaused(!paused);e.preventDefault();return;}
     if(paused){if(e.key==='Escape')setPaused(false);return;}
@@ -1309,6 +1605,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   });
 
   document.getElementById('startBtn').onclick = () => {
+    if(multi.mode!=='solo'){multi.status('먼저 온라인 대결 방을 만들거나 입장해 주세요.');return;}
     touchControls.classList.remove('show');
     menu.style.display = 'none';
     ready.style.display = 'flex';
@@ -1318,11 +1615,12 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   };
   document.getElementById('playBtn').onclick = startGame;
   document.getElementById('readyBack').onclick = () => {ready.style.display='none';menu.style.display='flex';};
-  document.getElementById('restartBtn').onclick = startGame;
+  document.getElementById('restartBtn').onclick = () => {if(multi.mode==='solo')startGame();else {multi.leave(true);openMenu();}};
   document.getElementById('backMenuBtn').onclick = openMenu;
   topMenuBtn.onclick = openMenu;
 
   function animate(now){
+    multi.tick(now);
     requestAnimationFrame(animate);
     const dt = (helpOpen || paused) ? 0 : Math.min((now - last)/1000, 0.05);
     last = now;
