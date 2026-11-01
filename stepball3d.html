@@ -1421,6 +1421,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     score = 0;
     lost = false;
     playing = true;
+    announceInput(multi.mode==='solo'?'🎮 게임 시작':'🎮 온라인 대결 시작 · 방향키로 이동!');
     resetHardTimer();
     touchControls.classList.add('show');
     scoreEl.textContent = '0000';
@@ -1590,29 +1591,47 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   const cheatModeInput = document.getElementById('cheatMode');
   let moving = false;
   let moveFrom = null, moveTo = null;
+  // 온라인 대결 조작 상태를 화면에서 확인할 수 있도록 표시한다.
+  const inputNotice = document.createElement('div');
+  inputNotice.id='inputNotice';
+  inputNotice.setAttribute('role','status');
+  inputNotice.style.cssText='position:fixed;left:50%;bottom:180px;transform:translateX(-50%);z-index:25;display:none;max-width:85vw;background:#132b48ed;color:white;padding:10px 16px;border-radius:14px;text-align:center;font-size:14px;font-weight:800;pointer-events:none;white-space:pre-wrap';
+  document.body.appendChild(inputNotice);
+  let inputNoticeUntil=0;
+  function announceInput(message){
+    inputNotice.textContent=message;
+    inputNotice.style.display='block';
+    inputNoticeUntil=performance.now()+2500;
+  }
+  function inputBlockReason(){
+    if(!playing)return '게임이 시작되지 않았어요';
+    if(lost)return '게임 종료 상태';
+    if(moving)return '점프 이동 중';
+    if(helpOpen)return '도움말 창이 열려 있어요';
+    if(paused)return '일시정지 상태';
+    if(grenadeCollapse>0)return '특수 효과 진행 중';
+    return '';
+  }
   function queueMove(dir){
-    if (!playing || lost || moving || helpOpen || paused || grenadeCollapse>0) {
-      if (!playing || lost || helpOpen || paused || grenadeCollapse>0) {
-        const reason = !playing ? '대결 시작 대기 중' : lost ? '게임 종료' : paused ? '일시정지 중' : helpOpen ? '도움말을 닫아주세요' : '특수 효과 진행 중';
-        if (multi.mode !== 'solo') multi.status('⚠️ 조작 불가: ' + reason);
+    const reason=inputBlockReason();
+    if(reason){announceInput('⚠️ '+reason);return;}
+    try {
+      maintainInfiniteTrack();
+      const current=stepData[stepIndex];
+      const next=stepData[stepIndex+1];
+      if(!current||!next){announceInput('⚠️ 다음 계단을 찾지 못했어요');return;}
+      if(!cheatModeInput.checked && dir!==current.requiredDir){
+        announceInput('❌ 잘못된 방향!');
+        beginFall(dir==='left'?-1:dir==='right'?1:0);
+        return;
       }
-      return;
+      moveFrom=current;moveTo=next;moving=true;
+      hardTimerEl.classList.remove('show');stepT=0;
+      announceInput('✅ '+(dir==='left'?'←':dir==='right'?'→':'↑')+' 점프!');
+    }catch(err){
+      console.error('StepBall move error:',err);
+      announceInput('⚠️ 이동 오류: '+String(err?.message||err).slice(0,130));
     }
-    maintainInfiniteTrack();
-    const next = stepData[stepIndex + 1];
-    if (!next) return;
-    const current = stepData[stepIndex];
-    const neededDir = current.requiredDir;
-    // 정면 직진 구간을 포함해 매 칸 하나의 방향키만 정답이다.
-    if (!cheatModeInput.checked && dir !== neededDir){
-      beginFall(dir === 'left' ? -1 : dir === 'right' ? 1 : 0);
-      return;
-    }
-    moveFrom = current;
-    moveTo = next;
-    moving = true;
-    hardTimerEl.classList.remove('show');
-    stepT = 0;
   }
   // 방향 전환 버튼은 좌/우를 선택, 오르기는 선택 방향으로 한 칸 점프한다.
   // 기존 키보드의 좌/우 키 조작도 계속 지원한다.
@@ -1656,7 +1675,8 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   topMenuBtn.onclick = openMenu;
 
   function animate(now){
-    multi.tick(now);
+    if(inputNoticeUntil && now>inputNoticeUntil){inputNotice.style.display='none';inputNoticeUntil=0;}
+    try{multi.tick(now);}catch(err){console.error('StepBall network tick:',err);}
     requestAnimationFrame(animate);
     const dt = (helpOpen || paused) ? 0 : Math.min((now - last)/1000, 0.05);
     last = now;
