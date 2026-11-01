@@ -1236,6 +1236,27 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     const $=id=>document.getElementById(id);
     const box=$('multiBox'), lobby=$('multiRoom'), hud=$('multiHUD'), info=$('multiRoomInfo');
     const statusEl=$('multiStatus');
+    const opponentFallBanner=document.createElement('div');
+    opponentFallBanner.id='opponentFallBanner';
+    opponentFallBanner.setAttribute('role','status');
+    opponentFallBanner.setAttribute('aria-live','assertive');
+    opponentFallBanner.style.cssText='position:fixed;z-index:40;top:25%;left:50%;transform:translate(-50%,-50%);display:none;pointer-events:none;text-align:center;font-size:clamp(24px,5vw,48px);font-weight:1000;color:white;background:#b7223deb;padding:20px 32px;border:3px solid #ffe6c8;border-radius:24px;box-shadow:0 16px 48px #1428448c;text-shadow:0 2px 5px #621329';
+    document.body.appendChild(opponentFallBanner);
+    let remoteFallAnnounced=false,fallBannerTimeout=null,lastGhostStep=-1,lastGhostPacket=0;
+    function announceOpponentFall(){
+      if(remoteFallAnnounced)return;
+      remoteFallAnnounced=true;
+      opponentFallBanner.textContent='💥 상대방 추락!';
+      opponentFallBanner.style.display='block';
+      if(fallBannerTimeout)clearTimeout(fallBannerTimeout);
+      fallBannerTimeout=setTimeout(()=>{opponentFallBanner.style.display='none';fallBannerTimeout=null;},4000);
+    }
+    function clearOpponentFall(){
+      remoteFallAnnounced=false;
+      opponentFallBanner.style.display='none';
+      if(fallBannerTimeout){clearTimeout(fallBannerTimeout);fallBannerTimeout=null;}
+    }
+
     // Remote player's translucent ball: keep it distinguishable even when the stairs overlap.
     const ghost=new THREE.Mesh(new THREE.SphereGeometry(ballRadius*1.06,32,24),new THREE.MeshBasicMaterial({color:0x26b8ff,transparent:true,opacity:.53,depthWrite:false,depthTest:false}));
     ghost.visible=false;ghost.renderOrder=80;scene.add(ghost);
@@ -1324,6 +1345,8 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       unsub=api.onValue(url('rooms/'+room),snap=>{
         const v=snap.val();if(!v){if(!started)statusError(Error('방이 종료됐어요.'));return;}
         activeRoom=v;const other=role==='host'?v.guest:v.host;opponent=other||null;opDead=!!other?.dead;
+        if(started && opDead)announceOpponentFall();
+
         if(v.seed!==undefined)matchSeed=v.seed>>>0;
         info.textContent=`${v.host?.name||'호스트'} ${v.host?.ready?'✅':'⌛'}  VS  ${v.guest?.name||'상대 기다리는 중'} ${v.guest?.ready?'✅':'⌛'}\n난이도: ${difficultyLabels[v.difficulty]||v.difficulty}\n${v.guest?'두 사람 모두 준비 버튼을 누르세요.':'친구 초대 또는 랜덤 상대를 기다리는 중...'}`;
         if(other && other.connected===false && !started)info.textContent+='\n⚠️ 상대가 연결을 종료했어요.';
@@ -1349,12 +1372,27 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
         }
         if(started){
           $('multiScoreLine').textContent=`🔵 ${name()} ${score}  ⚔️  ${other?.name||'상대'} ${other?.score||0}${opDead?' 💥':''}`;
-          if(other?.pos && Array.isArray(other.pos) && other.pos.length===3 && other.pos.every(Number.isFinite)){
-            opPos=new THREE.Vector3(...other.pos);
-            // First received position should not interpolate from the world origin.
-            if(!lastSeen) ghost.position.copy(opPos);
-            lastSeen=performance.now();ghost.visible=!other.dead;
+          // Use realtime coordinates when fresh. A step number is also sent on
+          // every landing, so late/missed frame packets cannot freeze the ghost.
+          const step=Number(other?.step);
+          const hasStep=Number.isInteger(step)&&step>=0;
+          const packet=Number(other?.posUpdatedAt)||0;
+          const validPos=Array.isArray(other?.pos)&&other.pos.length===3&&other.pos.every(n=>typeof n==='number'&&Number.isFinite(n));
+          if(validPos && (packet>=lastGhostPacket || !opPos)){
+            const target=new THREE.Vector3(...other.pos);
+            // The target is owned by the other player, never by the local ball.
+            opPos=target;
+            lastGhostPacket=packet;
+            if(!lastSeen)ghost.position.copy(opPos);
+            lastSeen=performance.now();
+          } else if(hasStep && step!==lastGhostStep && stepData[step]){
+            const st=stepData[step];
+            opPos=new THREE.Vector3(st.x,st.top+ballRadius+0.14,st.z);
+            if(!lastSeen)ghost.position.copy(opPos);
+            lastSeen=performance.now();
           }
+          if(hasStep)lastGhostStep=step;
+          ghost.visible=!!other&&!opDead;
           if(other?.dead && !mineDead){
             lastResult='🏆 승리! 상대가 먼저 추락했어요.';showDuelResult(lastResult);
           }
@@ -1370,6 +1408,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     function beginOnlineRound(){
       if(!room||started)return;
       started=true;
+      clearOpponentFall();lastGhostPacket=0;lastGhostStep=-1;
       lobby.classList.remove('show');
       try{startGame();}
       catch(e){started=false;statusError(e);console.error('StepBall online start failed',e);}
@@ -1382,6 +1421,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       if(multiStartTimer){clearTimeout(multiStartTimer);multiStartTimer=null;}
       scheduledStartAt=0;
       if(unsub){unsub();unsub=null;}
+      clearOpponentFall();lastGhostPacket=0;lastGhostStep=-1;
       const old=room,oldRole=role;room='';started=false;localReady=false;opponent=null;opPos=null;lastSeen=0;ghost.visible=false;hud.classList.remove('show');lobby.classList.remove('show');$('multiResult').style.display='none';
       if(old&&db){try{await api.update(url('rooms/'+old+'/'+oldRole),{connected:false,ready:false});}catch(e){}}
       if(resetMode){mode='solo';syncMode();}
@@ -1396,12 +1436,19 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     $('readyMulti').onclick=()=>readyUp().catch(statusError);
     $('leaveMulti').onclick=()=>leave().then(()=>status('대기실에서 나왔어요.'));
     $('copyRoom').onclick=async()=>{try{await navigator.clipboard.writeText(room);info.textContent+='\n📋 방 코드를 복사했어요.';}catch(e){info.textContent+='\n방 코드: '+room;}};
-    function onStart(){if(mode==='solo')return;hud.classList.add('show');ghost.visible=!!opponent&&!opponent.dead;ghost.position.copy(ballGroup.position);lastSeen=performance.now();lastResult='';mineDead=false;api?.update(url('rooms/'+room+'/'+role),{score:0,dead:false,pos:[ballGroup.position.x,ballGroup.position.y,ballGroup.position.z]}).catch(()=>{});}
-    function onStep(points){if(started&&room)api.update(url('rooms/'+room+'/'+role),{score:points}).catch(()=>{});}
-    function onLose(points){if(started&&room){mineDead=true;api.update(url('rooms/'+room+'/'+role),{score:points,dead:true}).catch(()=>{});showDuelResult(opDead?`종료 · 나 ${points} / 상대 ${opponent?.score||0}`:'💥 추락했어요. 상대 기록 확인 중...');}}
+    function onStart(){if(mode==='solo')return;hud.classList.add('show');ghost.visible=!!opponent&&!opponent.dead;ghost.position.copy(ballGroup.position);lastSeen=performance.now();lastResult='';mineDead=false;api?.update(url('rooms/'+room+'/'+role),{score:0,step:0,dead:false,pos:[ballGroup.position.x,ballGroup.position.y,ballGroup.position.z],posUpdatedAt:Date.now()}).catch(()=>{});}
+    function onStep(points){
+      if(!started||!room)return;
+      // Each landing broadcasts an authoritative milestone as well as position.
+      // This also recovers remote rendering if a per-frame update was missed.
+      const pos=[ballGroup.position.x,ballGroup.position.y,ballGroup.position.z].map(n=>+n.toFixed(3));
+      api.update(url('rooms/'+room+'/'+role),{score:points,step:stepIndex,pos,posUpdatedAt:Date.now(),dead:false})
+        .catch(e=>console.warn('StepBall landing sync failed',e));
+    }
+    function onLose(points){if(started&&room){mineDead=true;api.update(url('rooms/'+room+'/'+role),{score:points,step:stepIndex,dead:true,posUpdatedAt:Date.now()}).catch(e=>console.warn('StepBall fall sync failed',e));showDuelResult(opDead?`종료 · 나 ${points} / 상대 ${opponent?.score||0}`:'💥 추락했어요. 상대 기록 확인 중...');}}
     function tick(now){if(!started||!room)return;
-      if(playing&&!lost&&now-lastSend>120){lastSend=now;api.update(url('rooms/'+room+'/'+role+'/pos'),[+ballGroup.position.x.toFixed(2),+ballGroup.position.y.toFixed(2),+ballGroup.position.z.toFixed(2)]).catch(()=>{});}
-      if(opPos){ghost.position.lerp(opPos,.30);ghost.visible=!opDead&&now-lastSeen<12000;}else if(opponent){ghost.visible=!opDead&&now-lastSeen<12000;}
+      if(playing&&!lost&&now-lastSend>120){lastSend=now;api.update(url('rooms/'+room+'/'+role),{pos:[+ballGroup.position.x.toFixed(2),+ballGroup.position.y.toFixed(2),+ballGroup.position.z.toFixed(2)],posUpdatedAt:Date.now()}).catch(e=>console.warn('StepBall position sync failed',e));}
+      if(opPos){ghost.position.lerp(opPos,.30);ghost.visible=!opDead;}else if(opponent){ghost.visible=!opDead;}
     }
     return {get mode(){return mode;},get started(){return started;},status,leave,onStart,onStep,onLose,tick};
   })();
