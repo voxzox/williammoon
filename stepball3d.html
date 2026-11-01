@@ -1241,7 +1241,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     let api=null, app=null, db=null, auth=null, uid='', room='', unsub=null, activeRoom=null, lastSend=0, lastSeen=0, role='', mode='solo', started=false, localReady=false, opponent=null, opPos=null, opDead=false, mineDead=false, countdownQueued=false, lastResult='';
     const CONFIG_KEY='stepball_firebase_web_config';
     const DEFAULT_FIREBASE_CONFIG = {"apiKey":"AIzaSyB9WH1JZg4ggtRAtPlCqhC17--BuXu8uX8","authDomain":"stepball-arcade.firebaseapp.com","databaseURL":"https://stepball-arcade-default-rtdb.asia-southeast1.firebasedatabase.app","projectId":"stepball-arcade","storageBucket":"stepball-arcade.firebasestorage.app","messagingSenderId":"718818704633","appId":"1:718818704633:web:e04767945d3ec901da7628","measurementId":"G-DNSVKSDGC5"};
-    $('firebaseConfigInput').value=localStorage.getItem(CONFIG_KEY)||JSON.stringify(DEFAULT_FIREBASE_CONFIG,null,2);
+    $('firebaseConfigInput').value=JSON.stringify(DEFAULT_FIREBASE_CONFIG,null,2);
     function status(t){statusEl.textContent=t;}
     function setting(){try{const c=JSON.parse($('firebaseConfigInput').value.trim());if(!c.apiKey||!c.databaseURL||!c.projectId||!c.appId)throw Error('필수 항목 누락');return c;}catch(e){throw Error('Firebase 웹 앱 JSON 설정을 확인해 주세요.');}}
     async function connect(){
@@ -1281,14 +1281,27 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       status(forRandom?'🔎 상대를 기다리고 있어요.':'🎟 친구에게 방 코드를 알려주세요.');
     }
     async function joinRoom(code,forRandom=false){
-      await connect();await leave(false);
-      code=String(code||'').trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(code))throw Error('6자리 방 코드를 입력해 주세요.');
+      code=String(code||'').trim().toUpperCase();
+      if(!/^[A-Z0-9]{6}$/.test(code))throw Error('6자리 방 코드를 입력해 주세요.');
+      status('🔄 '+code+' 방에 연결하는 중...');
+      await connect();
+      await leave(false);
       const roomRef=url('rooms/'+code);
+      // Firebase RTDB runTransaction() initially sees uncached data as null.
+      // Preload the room before attempting the transaction, otherwise an
+      // early return from the callback can abort a perfectly valid join.
+      const initial=await api.get(roomRef);
+      const existing=initial.val();
+      if(!existing)throw Error('해당 방을 찾을 수 없어요. 코드를 다시 확인해 주세요.');
+      if(existing.host?.uid===uid)throw Error('이 브라우저에서 만든 방이에요. 다른 기기에서 입장해 주세요.');
+      if(existing.difficulty!==difficulty())throw Error('난이도가 달라요. 방장과 같은 난이도를 선택해 주세요.');
+      if(existing.state!=='waiting'||existing.guest)throw Error('이미 시작했거나 2명이 들어와 있는 방이에요.');
+      if(Date.now()-existing.createdAt>600000)throw Error('오래된 방이에요. 방장이 새로 생성해 주세요.');
       const tx=await api.runTransaction(roomRef,v=>{
         if(!v||v.guest||v.host?.uid===uid||v.state!=='waiting'||v.difficulty!==difficulty()||Date.now()-v.createdAt>600000)return;
-        v.guest={uid,name:name(),score:0,ready:false,dead:false,connected:true};return v;
-      });
-      if(!tx.committed)throw Error('방이 없거나 이미 시작했어요. 같은 난이도인지 확인해 주세요.');
+        return {...v,guest:{uid,name:name(),score:0,ready:false,dead:false,connected:true}};
+      },{applyLocally:false});
+      if(!tx.committed)throw Error('다른 사용자가 먼저 입장했거나 방 상태가 변경됐어요.');
       room=code;role='guest';started=false;localReady=false;mineDead=false;opDead=false;countdownQueued=false;matchSeed=tx.snapshot.val().seed>>>0;
       await api.onDisconnect(url('rooms/'+room+'/guest/connected')).set(false);
       showRoom();watchRoom();status(forRandom?'✅ 랜덤 매칭 성공!':'✅ 친구 방에 입장했어요.');
@@ -1343,7 +1356,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=async()=>{await leave();mode=b.dataset.mode;syncMode();});
     $('saveFirebase').onclick=()=>{try{setting();localStorage.setItem(CONFIG_KEY,$('firebaseConfigInput').value.trim());status('✅ 설정 저장 완료. 온라인 모드를 선택해 주세요.');}catch(e){statusError(e);}};
     $('createRoom').onclick=()=>createRoom(false).catch(statusError);
-    $('joinRoom').onclick=()=>joinRoom($('joinCode').value).catch(statusError);
+    $('joinRoom').onclick=async()=>{const btn=$('joinRoom');btn.disabled=true;btn.textContent='연결 중...';try{await joinRoom($('joinCode').value);}catch(e){statusError(e);}finally{btn.disabled=false;btn.textContent='입장';}};
     $('findRival').onclick=()=>createRoom(true).catch(statusError);
     $('readyMulti').onclick=()=>readyUp().catch(statusError);
     $('leaveMulti').onclick=()=>leave().then(()=>status('대기실에서 나왔어요.'));
