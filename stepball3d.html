@@ -1297,12 +1297,22 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       if(existing.difficulty!==difficulty())throw Error('난이도가 달라요. 방장과 같은 난이도를 선택해 주세요.');
       if(existing.state!=='waiting'||existing.guest)throw Error('이미 시작했거나 2명이 들어와 있는 방이에요.');
       if(Date.now()-existing.createdAt>600000)throw Error('오래된 방이에요. 방장이 새로 생성해 주세요.');
-      const tx=await api.runTransaction(roomRef,v=>{
-        if(!v||v.guest||v.host?.uid===uid||v.state!=='waiting'||v.difficulty!==difficulty()||Date.now()-v.createdAt>600000)return;
-        return {...v,guest:{uid,name:name(),score:0,ready:false,dead:false,connected:true}};
+      // Reserve only the empty guest slot. A room-level transaction can
+      // receive null before its initial server value is loaded, and can
+      // conflict with the host setting ready=true at the same time.
+      const guestRef=url('rooms/'+code+'/guest');
+      const guestInfo={uid,name:name(),score:0,ready:false,dead:false,connected:true};
+      const tx=await api.runTransaction(guestRef,current=>{
+        if(current !== null) return; // occupied: never overwrite another player
+        return guestInfo;
       },{applyLocally:false});
-      if(!tx.committed)throw Error('다른 사용자가 먼저 입장했거나 방 상태가 변경됐어요.');
-      room=code;role='guest';started=false;localReady=false;mineDead=false;opDead=false;countdownQueued=false;matchSeed=tx.snapshot.val().seed>>>0;
+      if(!tx.committed){
+        const latest=(await api.get(roomRef)).val();
+        if(!latest)throw Error('방이 종료됐어요. 방장이 새로운 방을 만들어 주세요.');
+        if(latest.guest)throw Error('이미 다른 플레이어가 입장했어요. 새 방을 만들어 주세요.');
+        throw Error('입장을 완료하지 못했어요. 방장이 새 방을 만든 후 다시 시도해 주세요.');
+      }
+      room=code;role='guest';started=false;localReady=false;mineDead=false;opDead=false;countdownQueued=false;matchSeed=existing.seed>>>0;
       await api.onDisconnect(url('rooms/'+room+'/guest/connected')).set(false);
       showRoom();watchRoom();status(forRandom?'✅ 랜덤 매칭 성공!':'✅ 친구 방에 입장했어요.');
     }
