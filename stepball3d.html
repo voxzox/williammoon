@@ -1236,8 +1236,11 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     const $=id=>document.getElementById(id);
     const box=$('multiBox'), lobby=$('multiRoom'), hud=$('multiHUD'), info=$('multiRoomInfo');
     const statusEl=$('multiStatus');
-    const ghost=new THREE.Mesh(new THREE.SphereGeometry(ballRadius,.0+32,24),new THREE.MeshPhongMaterial({color:0x48caff,transparent:true,opacity:.38,depthWrite:false,emissive:0x1177cc,emissiveIntensity:.34}));
-    ghost.visible=false;ghost.renderOrder=4;scene.add(ghost);
+    // Remote player's translucent ball: keep it distinguishable even when the stairs overlap.
+    const ghost=new THREE.Mesh(new THREE.SphereGeometry(ballRadius*1.06,32,24),new THREE.MeshBasicMaterial({color:0x26b8ff,transparent:true,opacity:.53,depthWrite:false,depthTest:false}));
+    ghost.visible=false;ghost.renderOrder=80;scene.add(ghost);
+    const ghostOutline=new THREE.Mesh(new THREE.SphereGeometry(ballRadius*1.13,24,16),new THREE.MeshBasicMaterial({color:0xbef5ff,transparent:true,opacity:.18,depthWrite:false,depthTest:false,side:THREE.BackSide}));
+    ghost.add(ghostOutline);
     let api=null, app=null, db=null, auth=null, uid='', room='', unsub=null, activeRoom=null, lastSend=0, lastSeen=0, role='', mode='solo', started=false, localReady=false, opponent=null, opPos=null, opDead=false, mineDead=false, countdownQueued=false, lastResult='';
     const CONFIG_KEY='stepball_firebase_web_config';
     const DEFAULT_FIREBASE_CONFIG = {"apiKey":"AIzaSyB9WH1JZg4ggtRAtPlCqhC17--BuXu8uX8","authDomain":"stepball-arcade.firebaseapp.com","databaseURL":"https://stepball-arcade-default-rtdb.asia-southeast1.firebasedatabase.app","projectId":"stepball-arcade","storageBucket":"stepball-arcade.firebasestorage.app","messagingSenderId":"718818704633","appId":"1:718818704633:web:e04767945d3ec901da7628","measurementId":"G-DNSVKSDGC5"};
@@ -1328,19 +1331,29 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
           countdownQueued=true;api.update(url('rooms/'+room),{state:'countdown',startAt:Date.now()+3400}).catch(statusError);
           api.get(url('queue/'+v.difficulty)).then(q=>{if(q.val()?.room===room)api.remove(url('queue/'+v.difficulty));});
         }
-        if(v.state==='countdown'&&!started&&!multiStartTimer){
-          const ms=Math.max(0,(v.startAt||Date.now()+3400)-Date.now());
-          info.textContent=`🚀 동시 출발! ${Math.ceil(ms/1000)}초 후 시작`;
-          multiStartTimer=setTimeout(()=>{
-            multiStartTimer=null;if(!room||started)return;
-            started=true;lobby.classList.remove('show');
-            startGame();
-          },ms);
+        // Both clients derive their start from the shared database state.
+        // The host also recovers when its local countdown timer is delayed/missed.
+        if((v.state==='countdown'||v.state==='playing')&&!started){
+          const startAt=Number(v.startAt)||Date.now();
+          const ms=Math.max(0,startAt-Date.now());
+          info.textContent=ms>0?`🚀 동시 출발! ${Math.ceil(ms/1000)}초 후 시작`:'🚀 대결 시작!';
+          if(!multiStartTimer || scheduledStartAt!==startAt){
+            if(multiStartTimer)clearTimeout(multiStartTimer);
+            scheduledStartAt=startAt;
+            multiStartTimer=setTimeout(()=>{
+              multiStartTimer=null;
+              if(!room||started)return;
+              beginOnlineRound();
+            },ms);
+          }
         }
         if(started){
           $('multiScoreLine').textContent=`🔵 ${name()} ${score}  ⚔️  ${other?.name||'상대'} ${other?.score||0}${opDead?' 💥':''}`;
-          if(other?.pos && Array.isArray(other.pos)){
-            opPos=new THREE.Vector3(...other.pos);lastSeen=performance.now();ghost.visible=!other.dead;
+          if(other?.pos && Array.isArray(other.pos) && other.pos.length===3 && other.pos.every(Number.isFinite)){
+            opPos=new THREE.Vector3(...other.pos);
+            // First received position should not interpolate from the world origin.
+            if(!lastSeen) ghost.position.copy(opPos);
+            lastSeen=performance.now();ghost.visible=!other.dead;
           }
           if(other?.dead && !mineDead){
             lastResult='🏆 승리! 상대가 먼저 추락했어요.';showDuelResult(lastResult);
@@ -1353,11 +1366,23 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
       },statusError);
     }
     let multiStartTimer=null;
+    let scheduledStartAt=0;
+    function beginOnlineRound(){
+      if(!room||started)return;
+      started=true;
+      lobby.classList.remove('show');
+      try{startGame();}
+      catch(e){started=false;statusError(e);console.error('StepBall online start failed',e);}
+      if(role==='host' && room){
+        api.update(url('rooms/'+room),{state:'playing'}).catch(e=>console.warn('Cannot mark room playing',e));
+      }
+    }
     function showDuelResult(txt){const r=$('multiResult');r.style.display='block';r.textContent=txt;}
     async function leave(resetMode=false){
       if(multiStartTimer){clearTimeout(multiStartTimer);multiStartTimer=null;}
+      scheduledStartAt=0;
       if(unsub){unsub();unsub=null;}
-      const old=room,oldRole=role;room='';started=false;localReady=false;opponent=null;opPos=null;ghost.visible=false;hud.classList.remove('show');lobby.classList.remove('show');$('multiResult').style.display='none';
+      const old=room,oldRole=role;room='';started=false;localReady=false;opponent=null;opPos=null;lastSeen=0;ghost.visible=false;hud.classList.remove('show');lobby.classList.remove('show');$('multiResult').style.display='none';
       if(old&&db){try{await api.update(url('rooms/'+old+'/'+oldRole),{connected:false,ready:false});}catch(e){}}
       if(resetMode){mode='solo';syncMode();}
     }
@@ -1371,12 +1396,12 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     $('readyMulti').onclick=()=>readyUp().catch(statusError);
     $('leaveMulti').onclick=()=>leave().then(()=>status('대기실에서 나왔어요.'));
     $('copyRoom').onclick=async()=>{try{await navigator.clipboard.writeText(room);info.textContent+='\n📋 방 코드를 복사했어요.';}catch(e){info.textContent+='\n방 코드: '+room;}};
-    function onStart(){if(mode==='solo')return;hud.classList.add('show');ghost.visible=!!opponent;lastResult='';mineDead=false;api?.update(url('rooms/'+room+'/'+role),{score:0,dead:false,pos:[ballGroup.position.x,ballGroup.position.y,ballGroup.position.z]}).catch(()=>{});}
+    function onStart(){if(mode==='solo')return;hud.classList.add('show');ghost.visible=!!opponent&&!opponent.dead;ghost.position.copy(ballGroup.position);lastSeen=performance.now();lastResult='';mineDead=false;api?.update(url('rooms/'+room+'/'+role),{score:0,dead:false,pos:[ballGroup.position.x,ballGroup.position.y,ballGroup.position.z]}).catch(()=>{});}
     function onStep(points){if(started&&room)api.update(url('rooms/'+room+'/'+role),{score:points}).catch(()=>{});}
     function onLose(points){if(started&&room){mineDead=true;api.update(url('rooms/'+room+'/'+role),{score:points,dead:true}).catch(()=>{});showDuelResult(opDead?`종료 · 나 ${points} / 상대 ${opponent?.score||0}`:'💥 추락했어요. 상대 기록 확인 중...');}}
     function tick(now){if(!started||!room)return;
       if(playing&&!lost&&now-lastSend>120){lastSend=now;api.update(url('rooms/'+room+'/'+role+'/pos'),[+ballGroup.position.x.toFixed(2),+ballGroup.position.y.toFixed(2),+ballGroup.position.z.toFixed(2)]).catch(()=>{});}
-      if(opPos){ghost.position.lerp(opPos,.23);ghost.visible=!opDead&&now-lastSeen<9000;}
+      if(opPos){ghost.position.lerp(opPos,.30);ghost.visible=!opDead&&now-lastSeen<12000;}else if(opponent){ghost.visible=!opDead&&now-lastSeen<12000;}
     }
     return {get mode(){return mode;},get started(){return started;},status,leave,onStart,onStep,onLose,tick};
   })();
@@ -1625,8 +1650,13 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   }
   function queueMove(dir){
     // A missed start transition must not silently trap both players at score zero.
-    if(!playing && !lost && !falling && multi.mode!=='solo' && multi.started) {
-      try { startGame(); }catch(e){lastMoveLabel='시작 오류: '+(e.message||e);announceInput('⚠️ '+lastMoveLabel);debugState();return;}
+    if(!playing && !lost && !falling && multi.mode!=='solo') {
+      if(multi.started){
+        try { startGame(); }catch(e){lastMoveLabel='시작 오류: '+(e.message||e);announceInput('⚠️ '+lastMoveLabel);debugState();return;}
+      }else{
+        lastMoveLabel='출발 동기화 대기';
+        announceInput('⚠️ 서버 출발 상태 확인 중 · 메뉴에서 방 상태를 확인하세요');
+      }
     }
     const reason=inputBlockReason();
     if(reason){lastMoveLabel='차단: '+reason;announceInput('⚠️ '+reason);debugState();return;}
