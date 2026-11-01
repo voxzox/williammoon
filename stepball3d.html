@@ -1429,6 +1429,8 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     showNextDir();
     menu.style.display = 'none';
     ready.style.display = 'none';
+    // Hidden lobby fields must not keep keyboard focus after matchmaking.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     gameOver.classList.remove('show');
     topMenuBtn.classList.add('show');
     helpBtn.classList.add('show');
@@ -1559,7 +1561,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     const comboMultiplier=Math.min(5,1+Math.floor(combo/10));
     comboHud.textContent=`🔥 연속 ${combo} · x${comboMultiplier}`;
     comboHud.style.transform='scale(1.15)';
-    if(combo%10===0) showMilestone(`🔥 ${combo}연속 착지! 콤보 x${multi}`);
+    if(combo%10===0) showMilestone(`🔥 ${combo}연속 착지! 콤보 x${comboMultiplier}`);
     if(stepIndex>0 && stepIndex%50===0) showMilestone(`🏁 ${stepIndex}칸 달성! 계속 올라가세요!`);
     score = stepIndex;
     multi.onStep(score);
@@ -1589,7 +1591,13 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   let moving = false;
   let moveFrom = null, moveTo = null;
   function queueMove(dir){
-    if (!playing || lost || moving || helpOpen || paused || grenadeCollapse>0) return;
+    if (!playing || lost || moving || helpOpen || paused || grenadeCollapse>0) {
+      if (!playing || lost || helpOpen || paused || grenadeCollapse>0) {
+        const reason = !playing ? '대결 시작 대기 중' : lost ? '게임 종료' : paused ? '일시정지 중' : helpOpen ? '도움말을 닫아주세요' : '특수 효과 진행 중';
+        if (multi.mode !== 'solo') multi.status('⚠️ 조작 불가: ' + reason);
+      }
+      return;
+    }
     maintainInfiniteTrack();
     const next = stepData[stepIndex + 1];
     if (!next) return;
@@ -1615,7 +1623,12 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   document.getElementById('forwardMove').addEventListener('click', () => queueMove('up'));
   document.getElementById('rightMove').addEventListener('click', () => queueMove('right'));
   addEventListener('keydown', e => {
-    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    // Ignore typing only while an actual visible form/menu is open.
+    // A hidden room-code field may retain focus after multiplayer starts.
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) {
+      if (menu.style.display !== 'none' || ready.style.display !== 'none') return;
+      e.target.blur?.();
+    }
     if (e.code==='Space' && !e.repeat) {e.preventDefault();grenadeExplode();return;}
     if ((e.key==='p'||e.key==='P') && !e.repeat && playing) {setPaused(!paused);e.preventDefault();return;}
     if(paused){if(e.key==='Escape')setPaused(false);return;}
