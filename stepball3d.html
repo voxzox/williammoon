@@ -102,7 +102,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;bac
 
 /* 작고 선명한 터치 조작 버튼 */
 #touchControls{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:none;gap:10px;z-index:7;width:min(390px,92vw);pointer-events:auto}
-#touchControls.show{display:flex}
+#touchControls.show,#hud.show ~ #touchControls{display:flex}
 .touchBtn{width:33.333%;height:70px;border:0;border-radius:19px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;color:white;box-shadow:inset 0 -6px 0 rgba(0,0,0,.13),0 4px 12px #20384c36;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;font-weight:950}
 .touchBtn .symbol{font-size:24px;line-height:1}
 .touchBtn .caption{font-size:15px}
@@ -1612,25 +1612,40 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
     if(grenadeCollapse>0)return '특수 효과 진행 중';
     return '';
   }
+  // Persistent in-game diagnostics: tells players whether a round really started.
+  const statePill=document.createElement('div');
+  statePill.id='stepballStatePill';
+  statePill.style.cssText='position:fixed;left:12px;top:74px;z-index:24;display:none;max-width:min(490px,85vw);padding:8px 11px;background:#132b48d9;color:#fff;border-radius:10px;font:700 12px system-ui;pointer-events:none;white-space:normal';
+  document.body.appendChild(statePill);
+  let lastMoveLabel='입력 대기';
+  function debugState(){
+    const visible=hud.classList.contains('show');
+    statePill.style.display=visible?'block':'none';
+    if(visible)statePill.textContent=`상태: ${playing?'진행 중':falling?'추락 중':lost?'게임 종료':'시작 대기'} · 온라인: ${multi.started?'출발':'대기'} · ${lastMoveLabel}`;
+  }
   function queueMove(dir){
+    // A missed start transition must not silently trap both players at score zero.
+    if(!playing && !lost && !falling && multi.mode!=='solo' && multi.started) {
+      try { startGame(); }catch(e){lastMoveLabel='시작 오류: '+(e.message||e);announceInput('⚠️ '+lastMoveLabel);debugState();return;}
+    }
     const reason=inputBlockReason();
-    if(reason){announceInput('⚠️ '+reason);return;}
+    if(reason){lastMoveLabel='차단: '+reason;announceInput('⚠️ '+reason);debugState();return;}
     try {
       maintainInfiniteTrack();
       const current=stepData[stepIndex];
       const next=stepData[stepIndex+1];
       if(!current||!next){announceInput('⚠️ 다음 계단을 찾지 못했어요');return;}
       if(!cheatModeInput.checked && dir!==current.requiredDir){
-        announceInput('❌ 잘못된 방향!');
+        lastMoveLabel='잘못된 방향: '+dir;announceInput('❌ 잘못된 방향!');debugState();
         beginFall(dir==='left'?-1:dir==='right'?1:0);
         return;
       }
       moveFrom=current;moveTo=next;moving=true;
       hardTimerEl.classList.remove('show');stepT=0;
-      announceInput('✅ '+(dir==='left'?'←':dir==='right'?'→':'↑')+' 점프!');
+      lastMoveLabel='입력 처리: '+dir;announceInput('✅ '+(dir==='left'?'←':dir==='right'?'→':'↑')+' 점프!');debugState();
     }catch(err){
       console.error('StepBall move error:',err);
-      announceInput('⚠️ 이동 오류: '+String(err?.message||err).slice(0,130));
+      lastMoveLabel='이동 오류: '+String(err?.message||err).slice(0,130);announceInput('⚠️ '+lastMoveLabel);debugState();
     }
   }
   // 방향 전환 버튼은 좌/우를 선택, 오르기는 선택 방향으로 한 칸 점프한다.
@@ -1675,6 +1690,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/
   topMenuBtn.onclick = openMenu;
 
   function animate(now){
+    debugState();
     if(inputNoticeUntil && now>inputNoticeUntil){inputNotice.style.display='none';inputNoticeUntil=0;}
     try{multi.tick(now);}catch(err){console.error('StepBall network tick:',err);}
     requestAnimationFrame(animate);
