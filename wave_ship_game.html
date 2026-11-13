@@ -1,108 +1,129 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#071322"><meta name="apple-mobile-web-app-capable" content="yes"><title>WAVE LAB — Liquid Simulator</title><link rel="manifest" href="wave-manifest.webmanifest"><style>
-:root{color-scheme:dark;--text:#eaf4ff;--soft:#9fb4c8;--stroke:#ffffff20;--cyan:#65d8fa;--lime:#b3ff69}
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#060f1b;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{touch-action:none}canvas{position:fixed;inset:0;width:100%;height:100%;display:block}.chrome{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}.header,.footer{display:flex;align-items:center;gap:9px;justify-content:space-between}.header{flex-wrap:wrap}.brand{font-size:16px;font-weight:900;letter-spacing:.08em}.brand em{color:var(--cyan);font-style:normal}.sub{color:var(--soft);font-size:10px;font-weight:700;letter-spacing:.1em}.panel{border:1px solid var(--stroke);background:#10253edb;box-shadow:0 12px 42px #0003;backdrop-filter:blur(14px);border-radius:17px;padding:10px 14px}.header .panel{max-width:100%}.status{font-size:11px;color:#d9eaff;max-width:330px;line-height:1.55}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f6cb61;margin-right:5px}.dot.on{background:#8fffaa}.dot.off{background:#ff8b88}.controls{pointer-events:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.btn{cursor:pointer;min-height:44px;padding:11px 14px;border-radius:12px;background:#163149ed;border:1px solid #76b6e34d;color:#f5fbff;font-weight:750;font-size:12px;white-space:nowrap}.btn:active{transform:scale(.97)}.btn.primary{background:linear-gradient(110deg,#adf974,#5de2eb);color:#06202e;border:0}.footer{margin-top:auto;flex-wrap:wrap;align-items:end}.footer .panel{font-size:11px;color:#bdd3e3;line-height:1.5;max-width:320px}.overlay{position:fixed;inset:0;display:none;place-items:center;background:#020a14cc;backdrop-filter:blur(8px);z-index:3;padding:18px}.overlay.show{display:grid}.modal{pointer-events:auto;width:min(470px,100%);max-height:90dvh;overflow:auto;border-radius:24px;background:#0e2337;border:1px solid #ffffff28;padding:22px;box-shadow:0 30px 80px #0009}.modal h2{margin:0 0 8px;font-size:24px}.modal p{font-size:13px;color:#9bb9cc;line-height:1.6}.levels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:18px 0}.levels button{min-height:52px;text-align:left;white-space:normal}.ship-title{font-weight:800;color:var(--lime)}@media(max-width:620px){.chrome{gap:7px}.header{align-items:flex-start}.brand{font-size:14px}.status{font-size:10px}.footer{justify-content:center}.footer .panel{display:none}.btn{font-size:11px;padding:9px 10px}.controls{width:100%}.controls .btn{flex:1}.header .panel{padding:8px 10px}.sub{font-size:9px}}@media(max-height:580px){.footer .panel{display:none}.chrome{gap:4px;padding-top:6px;padding-bottom:6px}}
-</style></head><body><canvas id="world"></canvas><div class="chrome">
-<div class="header"><div class="panel"><div class="brand">WAVE<em>LAB</em> <span class="sub">/ LIQUID SIMULATOR</span></div><div class="sub" id="modeLabel">FREE PLAY · WATER 50%</div></div><div class="panel status" id="sensor"><span class="dot"></span>센서 대기 · 아래에서 센서 켜기를 누르세요</div></div>
-<div class="footer"><div class="panel" id="help">폰을 기울이거나 흔들어 보세요. 화면을 밀어도 물이 움직여요.</div><div class="controls"><button class="btn" id="sensorBtn">📱 센서 켜기</button><button class="btn" id="splashBtn">🌊 흔들기</button><button class="btn" id="refillBtn">↻ 물 채우기</button><button class="btn primary" id="gameBtn">🚢 미니게임</button></div></div></div>
-<div class="overlay" id="menu"><div class="modal"><h2>🚢 침몰 챌린지</h2><p>파도와 선체 타격으로 배를 침몰시켜 보세요. 자유 물놀이는 언제든 돌아갈 수 있어요.</p><div class="levels" id="levelList"></div><button class="btn" id="backBtn" style="width:100%">🌊 자유 물놀이로 돌아가기</button></div></div>
-<div class="overlay" id="win"><div class="modal"><h2>🏆 침몰 성공!</h2><p id="winText">다음 배를 침몰시켜 보세요.</p><button class="btn primary" id="nextBtn" style="width:100%">다음 레벨</button><button class="btn" id="exitBtn" style="width:100%;margin-top:9px">자유 물놀이</button></div></div>
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#061627"><title>WAVE TANK | 침몰 챌린지</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#051422;color:#eaf9ff;font-family:system-ui,-apple-system,sans-serif;touch-action:none}canvas{position:fixed;inset:0;width:100%;height:100%}.ui{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));gap:9px}.top,.bottom{display:flex;align-items:center;justify-content:space-between;gap:7px}.pill{border:1px solid #9beaff38;background:#071a2de8;backdrop-filter:blur(10px);padding:9px 12px;border-radius:15px;font-size:12px;font-weight:750}.logo{font-size:17px;letter-spacing:-.04em}.light{color:#71defe}.bottom{margin-top:auto;align-items:flex-end}.col{display:flex;flex-direction:column;gap:7px}.ui button{pointer-events:auto;color:#edffff;border:1px solid #79e4f65c;background:#10364abf;border-radius:14px;padding:12px 14px;font-size:13px;font-weight:800;min-height:44px}.ui button.primary{background:#a6f655;color:#07231b;border:0}.ui button:active{transform:scale(.97)}.message{align-self:center;text-align:center;max-width:430px;background:#082337d9;padding:9px 13px;border-radius:13px;font-size:12px;border:1px solid #83daff36}.sensor{font-size:11px;max-width:230px;line-height:1.6}.overlay{pointer-events:auto;position:fixed;inset:0;background:#00131dbb;display:none;place-items:center;padding:20px}.overlay.show{display:grid}.modal{width:min(420px,100%);border:1px solid #72e7ff55;background:#0a2635;padding:25px;border-radius:24px;box-shadow:0 15px 60px #0008}.modal h1{margin:0 0 8px;font-size:27px}.modal p{line-height:1.65;color:#b6d6df}.modal button{border:0;border-radius:13px;padding:13px 20px;background:#baff58;color:#07251a;font-weight:850;font-size:15px;width:100%}.modal small{color:#8eb3c0}.levelbar{font-size:11px;opacity:.86}@media(max-width:400px){.logo{font-size:15px}.pill{padding:8px 9px}.ui{padding-left:8px;padding-right:8px}.ui button{padding:10px}.sensor{max-width:175px}}
+</style></head><body>
+<canvas id="game"></canvas>
+<div class="ui"><div class="top"><div class="pill"><div class="logo">🌊 WAVE <span class="light">TANK</span></div><div class="levelbar" id="level">LEVEL 1 / 8</div></div><div class="pill" id="objective">배를 침몰시켜!</div></div><div class="top"><div class="pill sensor" id="sensor">📱 센서 확인 중…</div><button id="enable">자이로 켜기</button></div><div class="message" id="hint">자유 물놀이: 휴대폰을 뒤집으면 물이 쏟아져요! 미니게임 버튼으로 배를 침몰시키세요.</div><div class="bottom"><div class="col"><button id="mode" class="primary">🚢 미니게임 시작</button><button id="wave">🌊 큰 파도</button><button id="tiltLeft">↶ 왼쪽</button></div><div class="col"><button id="refill">💧 물 다시 채우기</button><button id="reset">↻ 초기화</button><button id="tiltRight">오른쪽 ↷</button><button class="primary" id="next" style="display:none">다음 레벨 ➜</button></div></div></div>
+<div class="overlay" id="overlay"><div class="modal"><h1 id="resultTitle">성공!</h1><p id="resultText"></p><button id="continue">다음 레벨 시작</button><p><small>물리 시뮬레이션은 게임용 근사 모델입니다.</small></p></div></div>
 <script>
-(()=>{'use strict';
-const canvas=document.getElementById('world'),c=canvas.getContext('2d',{alpha:false}),$=id=>document.getElementById(id);
-const lerp=(a,b,t)=>a+(b-a)*t,clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),rnd=(a,b)=>a+Math.random()*(b-a);
-let W=0,H=0,dpr=1,tank={x:0,y:0,w:0,h:0},volume=.50,angX=0,angY=1,targetX=0,targetY=1,manualUntil=0;
-let orientationCount=0,motionCount=0,lastSensor=0,lastShake=0,lastAcceleration=null,permissionNeeded=false,sensorState='idle',frame=0,mode='free',level=0,ship=null,drag=null;
-const N=85,displacement=new Float32Array(N),speed=new Float32Array(N),drops=[],bubbles=[];
-const configs=[['종이배',75,2],['목선',98,3],['어선',108,4],['요트',122,5],['구조선',134,6],['화물선',148,7],['여객선',161,8],['폭풍선',178,10]];
-function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);c.setTransform(dpr,0,0,dpr,0,0);const pad=Math.max(16,Math.min(W*.08,65));tank={x:pad,y:Math.max(90,H*.20),w:W-2*pad,h:Math.max(140,H*.57)};if(ship)ship.x=clamp(ship.x,tank.x+ship.w*.4,tank.x+tank.w-ship.w*.4)}
-addEventListener('resize',resize);
-function status(txt,state){sensorState=state;const cls=state==='on'?'on':state==='off'?'off':'';$('sensor').innerHTML='<span class="dot '+cls+'"></span>'+txt}
-function gravityFromOrientation(e){
- if(e.beta==null||e.gamma==null)return;
- const beta=e.beta*Math.PI/180,gamma=e.gamma*Math.PI/180,screenAngle=(screen.orientation&&Number.isFinite(screen.orientation.angle))?screen.orientation.angle:(typeof window.orientation==='number'?window.orientation:0),rot=screenAngle*Math.PI/180;
- // Device axes mapped to visible screen axes; upright portrait: beta≈90° => down.
- const gx=Math.sin(gamma),gy=Math.sin(beta)*Math.cos(gamma);
- targetX=clamp(gx*Math.cos(rot)-gy*Math.sin(rot),-1,1);
- targetY=clamp(gx*Math.sin(rot)+gy*Math.cos(rot),-1,1);
- orientationCount++;lastSensor=performance.now();
- if(orientationCount%4===0)status('센서 연결 · 좌우 '+Math.round(e.gamma)+'° / 앞뒤 '+Math.round(e.beta)+'°','on');
-}
-function motion(e){
- const a=e.accelerationIncludingGravity;if(!a)return;
- motionCount++;let ax=Number(a.x)||0,ay=Number(a.y)||0,az=Number(a.z)||0;
- const mag=Math.hypot(ax,ay,az);
- if(lastAcceleration&&performance.now()-lastShake>160){
- const delta=Math.hypot(ax-lastAcceleration[0],ay-lastAcceleration[1],az-lastAcceleration[2]);
- if(delta>5.8){splash(1.6);lastShake=performance.now()}
+(function(){
+'use strict';
+var canvas=document.getElementById('game'),ctx=canvas.getContext('2d',{alpha:false}),dpr=1,W=0,H=0,tank={x:0,y:0,w:0,h:0},surface=[],velocity=[],segments=95,waterLevel=0,ship=null,particles=[],debris=[],level=0,win=false,frame=0,tilt=0,sensorTilt=0,shake=0,lastAccel=0,lastMotion=0,lastOrientation=0,orientationCount=0,motionCount=0,permissionAsked=false,dragStart=null,mouseX=0,mouseY=0;
+var freeMode=true,waterAmount=.5,gravityX=0,gravityY=1,spillDrops=[],spillPhase=0,prevGravityX=0,prevGravityY=1,lastShakeAt=0;
+var levels=[
+{name:'종이배',width:74,health:2,leak:1.1,buoy:1.0,wave:1.0},
+{name:'나무배',width:100,health:4,leak:.75,buoy:1.1,wave:1.0},
+{name:'어선',width:115,health:5,leak:.65,buoy:1.05,wave:1.1},
+{name:'요트',width:125,health:6,leak:.5,buoy:1.0,wave:1.2},
+{name:'구조선',width:135,health:7,leak:.48,buoy:1.1,wave:1.3},
+{name:'화물선',width:155,health:8,leak:.43,buoy:1.16,wave:1.4},
+{name:'유람선',width:170,health:9,leak:.40,buoy:1.13,wave:1.5},
+{name:'폭풍의 최종선',width:184,health:12,leak:.38,buoy:1.16,wave:1.9}
+];
+function el(id){return document.getElementById(id)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rnd(a,b){return a+Math.random()*(b-a)}
+function resize(){dpr=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);tank.x=Math.max(13,W*.07);tank.w=W-2*tank.x;tank.y=Math.max(112,H*.20);tank.h=Math.max(180,H*.59);waterLevel=tank.y+tank.h*.50;var old=surface.slice();surface=Array.from({length:segments},function(_,i){return old.length?old[Math.min(old.length-1,Math.round(i*(old.length-1)/(segments-1)))]||0:0});velocity=Array.from({length:segments},function(){return 0});if(ship)ship.x=clamp(ship.x,tank.x+ship.w/2,tank.x+tank.w-ship.w/2)}
+function surfaceAt(x){var i=clamp((x-tank.x)/tank.w*(segments-1),0,segments-1),j=Math.floor(i);return waterLevel+(surface[j]||0)*(1-(i-j))+(surface[Math.min(segments-1,j+1)]||0)*(i-j)+tilt*(x-(tank.x+tank.w/2))*.18}
+function splash(x,y,power,count){count=count||14;for(var i=0;i<count;i++)particles.push({x:x,y:y,vx:rnd(-2.8,2.8)*power,vy:rnd(-5,-.4)*power,r:rnd(1.5,4.2),life:rnd(25,70),max:70,under:false});if(particles.length>280)particles.splice(0,particles.length-280)}
+function bubble(x,y){particles.push({x:x,y:y,vx:rnd(-.55,.55),vy:rnd(-1.7,-.55),r:rnd(1.5,5),life:rnd(40,110),max:110,under:true})}
+function disturb(x,power){var k=Math.round(clamp((x-tank.x)/tank.w,0,1)*(segments-1));for(var i=-5;i<=5;i++){var j=k+i;if(j>=0&&j<segments)velocity[j]+=power*Math.exp(-i*i/9)}}
+function bigWave(){for(var i=0;i<segments;i++){velocity[i]+=(i<segments/2?1:-1)*rnd(1.3,3.2)*levels[level].wave}shake=12;for(var k=0;k<4;k++)disturb(rnd(tank.x,tank.x+tank.w),rnd(-8,8));if(ship)splash(ship.x,surfaceAt(ship.x),1.4,22);else splash(tank.x+tank.w*.5,waterLevel,1.7,30)}
+function newLevel(index){freeMode=false;el("mode").textContent="🌊 자유 물놀이";waterAmount=.5;gravityX=0;gravityY=1;spillDrops=[];level=index%levels.length;win=false;el('overlay').classList.remove('show');el('next').style.display='none';el('level').textContent='LEVEL '+(level+1)+' / '+levels.length+' · '+levels[level].name;el('objective').textContent='선체 '+levels[level].health+'회 타격';surface.fill(0);velocity.fill(0);particles=[];debris=[];var c=levels[level];ship={x:tank.x+tank.w*.50,y:waterLevel-20,w:Math.min(c.width,tank.w*.62),vy:0,vx:0,angle:0,angV:0,damage:0,fill:0,holes:[],sunk:false};el('hint').textContent='배를 터치해 구멍을 내고, 파도로 균형을 무너뜨려 침몰시키세요.'}
+function impact(x,y){if(freeMode){disturb(x,13);splash(x,y,1.9,22);for(var n=0;n<12;n++)addDrop(x,y,rnd(-5,5),rnd(-6,-1),rnd(2,5));return}if(!ship||win)return;var s=ship;if(Math.abs(x-s.x)<s.w*.60 && Math.abs(y-s.y)<56){s.damage++;s.holes.push({dx:x-s.x,dy:y-s.y});s.vy+=1.7;s.angV+=(x-s.x)/s.w*.075;s.fill+=.055;disturb(s.x,6);splash(x,y,1.2,15);for(var i=0;i<7;i++)debris.push({x:x,y:y,vx:rnd(-3,3),vy:rnd(-3,-.5),life:rnd(25,80),angle:rnd(0,6)});el('objective').textContent='타격 '+s.damage+' / '+levels[level].health;if(s.damage>=levels[level].health)s.fill+=.20}else{disturb(x,9);splash(x,clamp(y,waterLevel-20,tank.y+tank.h),1,9)}}
+function sensorText(status){el('sensor').textContent=status}
+function orient(e){if(e.gamma==null&&e.beta==null)return;orientationCount++;lastOrientation=performance.now();var g=Number(e.gamma)||0,b=Number(e.beta)||0;sensorTilt=clamp(Math.sin(g*Math.PI/180),-1,1);gravityX=clamp(Math.sin(g*Math.PI/180),-1,1);gravityY=clamp(Math.sin(b*Math.PI/180)*Math.cos(g*Math.PI/180),-1,1);sensorText('🟢 센서 작동 · 좌우 '+g.toFixed(0)+'° / 앞뒤 '+b.toFixed(0)+'°'+(motionCount?' · 흔들기 활성':' · 흔들기 대기'));el('enable').textContent='센서 연결됨'}
+function motion(e){var a=e.acceleration||e.accelerationIncludingGravity;if(!a)return;motionCount++;lastMotion=performance.now();var x=a.x||0,y=a.y||0,z=a.z||0,mag=Math.hypot(x,y,z);var delta=Math.abs(mag-lastAccel);lastAccel=mag;if(delta>6&&performance.now()-lastShakeAt>140){lastShakeAt=performance.now();bigWave();emitSpray(24)}if(!orientationCount&&motionCount>3)sensorText('🟡 움직임 감지 · 기울기 대기')}
+window.addEventListener('deviceorientation',orient,true);window.addEventListener('devicemotion',motion,true);
+async function enableSensor(){permissionAsked=true;try{var requests=[];if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function')requests.push(DeviceOrientationEvent.requestPermission());if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function')requests.push(DeviceMotionEvent.requestPermission());if(requests.length){var results=await Promise.all(requests);if(results.some(function(x){return x!=='granted'})){sensorText('🔴 센서 권한 거부됨 · 설정에서 허용');return}}sensorText('🟡 권한 허용됨 · 휴대폰을 기울여 확인');setTimeout(function(){if(!orientationCount&&!motionCount)sensorText('⚪ 센서 신호 없음 · HTTPS와 기기 설정 확인')},2500)}catch(e){sensorText('🔴 센서 사용 불가 · '+e.message)}}
+el('enable').addEventListener('click',enableSensor);el('wave').addEventListener('click',function(){bigWave();emitSpray(26)});el('reset').addEventListener('click',function(){if(freeMode)startFree();else newLevel(level)});el('refill').addEventListener('click',function(){waterAmount=.5;spillDrops=[];if(!freeMode)newLevel(level)});el('mode').addEventListener('click',function(){if(freeMode)newLevel(0);else startFree()});el('next').addEventListener('click',function(){newLevel(level+1)});
+el('tiltLeft').addEventListener('click',function(){gravityX=clamp(gravityX-.6,-1,1);tilt=gravityX;bigWave();emitSpray(10)});el('tiltRight').addEventListener('click',function(){gravityX=clamp(gravityX+.6,-1,1);tilt=gravityX;bigWave();emitSpray(10)});
+el('continue').addEventListener('click',function(){newLevel(level+1)});
+canvas.addEventListener('pointerdown',function(e){dragStart={x:e.clientX,y:e.clientY,time:performance.now()};mouseX=e.clientX;mouseY=e.clientY;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',function(e){if(!dragStart)return;var dx=e.clientX-mouseX;mouseX=e.clientX;mouseY=e.clientY;if(Math.abs(dx)>1){tilt=clamp(tilt+dx/90,-1,1);gravityX=tilt;disturb(e.clientX,clamp(dx*.36,-6,6))}});
+canvas.addEventListener('pointerup',function(e){if(!dragStart)return;if(Math.hypot(e.clientX-dragStart.x,e.clientY-dragStart.y)<25)impact(e.clientX,e.clientY);else if(Math.abs(e.clientX-dragStart.x)>90)bigWave();dragStart=null});
+function drawShip(){var s=ship;if(!s||freeMode)return;ctx.save();ctx.translate(s.x,s.y);ctx.rotate(s.angle);var w=s.w,h=w*.29;ctx.fillStyle='#192e43';ctx.beginPath();ctx.moveTo(-w*.53,-h*.25);ctx.lineTo(w*.51,-h*.25);ctx.lineTo(w*.36,h*.55);ctx.lineTo(-w*.34,h*.55);ctx.closePath();ctx.fill();ctx.strokeStyle='#8ac5df';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#df6e4b';ctx.fillRect(-w*.42,-h*.26,w*.84,h*.12);ctx.fillStyle='#e5f3f4';ctx.fillRect(-w*.24,-h*.75,w*.42,h*.47);ctx.fillStyle='#4c99c5';for(var i=0;i<3;i++)ctx.fillRect(-w*.18+i*w*.12,-h*.65,w*.075,h*.13);ctx.fillStyle='#f8dc8b';ctx.fillRect(w*.14,-h*.94,w*.06,h*.20);ctx.fillStyle='#22333a';ctx.fillRect(-w*.4,h*.12,w*.8,Math.max(1,h*.05));for(var j=0;j<s.holes.length;j++){var p=s.holes[j];ctx.fillStyle='#050c16';ctx.beginPath();ctx.arc(p.dx,clamp(p.dy,-h*.1,h*.45),4,0,Math.PI*2);ctx.fill()}if(s.fill>0){ctx.fillStyle='rgba(31,174,230,.55)';ctx.fillRect(-w*.35,h*(.46-s.fill*.8),w*.70,Math.min(h*.8,s.fill*h*.75))}ctx.restore()}
+function physics(){frame++;var sensorActive=orientationCount&&performance.now()-lastOrientation<2200;if(sensorActive){tilt+=(sensorTilt-tilt)*.48}else if(!dragStart){tilt*=.985;gravityX*=.985;gravityY+=(1-gravityY)*.022}tilt=clamp(tilt,-1,1);var old=surface.slice();for(var i=0;i<segments;i++){var left=old[Math.max(0,i-1)],right=old[Math.min(segments-1,i+1)];var force=-old[i]*.024+(left+right-2*old[i])*.20;velocity[i]=(velocity[i]+force)*.982;surface[i]=clamp(old[i]+velocity[i],-tank.h*.23,tank.h*.23)}if(level===7&&frame%90===0)bigWave();
+var s=ship,c=levels[level];if(!freeMode&&s&&!win){var sea=surfaceAt(s.x),a=surfaceAt(s.x-s.w*.30),b=surfaceAt(s.x+s.w*.30),slope=Math.atan2(b-a,s.w*.6);var desired=sea-s.w*.095+s.fill*s.w*.88;var gravity=(desired-s.y)*.028;s.vy=(s.vy+gravity)*.91;s.y+=s.vy;s.angV+=(slope-s.angle)*.022; s.angV+=(tilt*.17-s.angle)*.006;s.angV*=.92;s.angle=clamp(s.angle+s.angV,-1.48,1.48);s.vx+=(tilt*.11+Math.sin(frame*.01)*.012);s.vx*=.984;s.x=clamp(s.x+s.vx,tank.x+s.w*.46,tank.x+tank.w-s.w*.46);if(s.damage)s.fill+=.00035+s.damage*c.leak*.00012;if(Math.abs(s.angle)>.68)s.fill+=.0017;if(s.y>sea+s.w*.15)s.fill+=.0015;if(s.fill>.27&&frame%5===0)bubble(s.x+rnd(-s.w*.28,s.w*.28),s.y+12);if(frame%28===0&&Math.abs(s.vy)>1)splash(s.x,sea,.4,3);if(s.fill>=1||s.y>tank.y+tank.h-18){win=true;s.sunk=true;setTimeout(function(){el('resultTitle').textContent='🚢 침몰 성공!';el('resultText').textContent=(level+1)+'레벨 '+c.name+' 격침 완료! 다음 배는 더 튼튼하고 어렵습니다.';el('continue').textContent=level===7?'처음부터 다시':'다음 레벨 시작';el('next').style.display='block';el('overlay').classList.add('show')},850)}}updateSpill();for(var p=particles.length-1;p>=0;p--){var q=particles[p];q.x+=q.vx;q.y+=q.vy;q.life--;if(q.under){q.vx*=.98;if(q.y<=surfaceAt(q.x)){disturb(q.x,-.8);particles.splice(p,1);continue}}else{q.vy+=.17;q.vx*=.99;if(q.y>surfaceAt(q.x)&&q.vy>0){bubble(q.x,q.y);particles.splice(p,1);continue}}if(q.life<=0)particles.splice(p,1)}for(var z=debris.length-1;z>=0;z--){var d=debris[z];d.x+=d.vx;d.y+=d.vy;d.vy+=.12;d.life--;if(d.life<=0)debris.splice(z,1)}}
+
+function addDrop(x,y,vx,vy,r){spillDrops.push({x:x,y:y,vx:vx,vy:vy,r:r||rnd(2,5),life:380});if(spillDrops.length>420)spillDrops.splice(0,spillDrops.length-420)}
+function emitSpray(count){var cx=tank.x+tank.w*.5;for(var i=0;i<count;i++){var x=rnd(tank.x+12,tank.x+tank.w-12),y=freeMode?waterLevel:rnd(waterLevel-8,waterLevel+8);addDrop(x,y,rnd(-6,6)+gravityX*4,rnd(-7,-1)+gravityY*1.5,rnd(1.7,5.5))}}
+function startFree(){freeMode=true;ship=null;win=false;waterAmount=.5;spillDrops=[];surface.fill(0);velocity.fill(0);gravityX=0;gravityY=1;tilt=0;el('overlay').classList.remove('show');el('next').style.display='none';el('mode').textContent='🚢 미니게임 시작';el('level').textContent='FREE PLAY · 물리 실험';el('objective').textContent='물 '+Math.round(waterAmount*100)+'%';el('hint').textContent='휴대폰을 거꾸로 뒤집거나 흔들어 보세요. 물이 위로 쏟아지고 작은 물방울이 튀어요!'}
+function updateSpill(){
+ var gx=gravityX,gy=gravityY,ml=Math.max(.35,Math.hypot(gx,gy));gx/=ml;gy/=ml;
+ if(freeMode&&waterAmount>0.005){
+  var upward=Math.max(0,-gy),side=Math.abs(gx),opening=upward*.005+Math.max(0,side-.65)*.0017;
+  if(opening>0&&frame%2===0){
+   var lost=Math.min(waterAmount,opening);
+   waterAmount-=lost;
+   var amt=Math.min(16,Math.max(2,Math.round(lost*1700)));
+   for(var i=0;i<amt;i++){
+    var x=tank.x+rnd(5,tank.w-5);
+    addDrop(x,tank.y+rnd(0,22),gx*rnd(2,8)+rnd(-3,3),-rnd(2,8)-upward*4,rnd(2.5,6.8));
+   }
+   if(frame%12===0)el('objective').textContent='남은 물 '+Math.round(waterAmount*100)+'%';
+  }
  }
- lastAcceleration=[ax,ay,az];
- // iOS and Android sometimes restrict orientation but expose accelerometer.
- if(performance.now()-lastSensor>1200&&mag>2){
- const sx=clamp(-ax/mag,-1,1),sy=clamp(ay/mag,-1,1);
- targetX=sx;targetY=sy;lastSensor=performance.now();
- status('움직임 센서 연결 · 좌우 '+Math.round(sx*100)+'%','on')
+ for(var k=spillDrops.length-1;k>=0;k--){
+  var d=spillDrops[k];
+  d.vx+=gx*.18;d.vy+=gy*.18;d.vx*=.997;d.vy*=.997;d.x+=d.vx;d.y+=d.vy;d.life--;
+  // Inside the tank: rebound from walls and floor, never from the open top.
+  if(d.y>=tank.y&&d.y<=tank.y+tank.h+10){
+   if(d.x<tank.x+d.r){d.x=tank.x+d.r;d.vx=Math.abs(d.vx)*.52}
+   if(d.x>tank.x+tank.w-d.r){d.x=tank.x+tank.w-d.r;d.vx=-Math.abs(d.vx)*.52}
+   if(d.y>tank.y+tank.h-d.r){d.y=tank.y+tank.h-d.r;d.vy=-Math.abs(d.vy)*.43}
+  }
+  if(d.life<1||d.y>H+60||d.x<-60||d.x>W+60||d.y<-90)spillDrops.splice(k,1);
  }
 }
-addEventListener('deviceorientation',gravityFromOrientation,true);
-addEventListener('devicemotion',motion,true);
-$('sensorBtn').onclick=async()=>{
- try{
- let asked=false,allowed=true;
- if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){asked=true;allowed=(await DeviceOrientationEvent.requestPermission())==='granted'&&allowed}
- if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){asked=true;allowed=(await DeviceMotionEvent.requestPermission())==='granted'&&allowed}
- if(!allowed){status('센서 권한 거부 · 브라우저 설정에서 허용','off');return}
- status('센서 대기 · 휴대폰을 기울여 보세요','idle');
- setTimeout(()=>{if(performance.now()-lastSensor>2300)status('신호 없음 · HTTPS / 센서 지원 여부 확인','off')},2600);
- }catch(err){status('센서 권한 요청 실패 · '+String(err.message).slice(0,38),'off')}
-};
-function particle(x,y,vx,vy,r=3){if(drops.length>240)drops.shift();drops.push({x,y,vx,vy,r,life:150})}
-function emit(x,y,count,strength){for(let i=0;i<count;i++)particle(x+rnd(-20,20),y+rnd(-5,5),rnd(-4,4)*strength,rnd(-5,-.5)*strength,rnd(1.4,4))}
-function splash(scale=1){for(let i=0;i<N;i++)speed[i]+=Math.sin(i*.18+frame*.14)*rnd(-1.8,1.8)*scale;const x=tank.x+tank.w*rnd(.2,.8),y=tank.y+tank.h*.5;emit(x,y,22,scale)}
-$('splashBtn').onclick=()=>splash(2);
-$('refillBtn').onclick=()=>{volume=.5;drops.length=0;displacement.fill(0);speed.fill(0);if(mode==='ship')startLevel(level);updateLabel()};
-function updateLabel(){$('modeLabel').textContent=mode==='free'?'FREE PLAY · WATER '+Math.round(volume*100)+'%':'LEVEL '+(level+1)+' / '+configs.length+' · '+configs[level][0]}
-function startLevel(i){mode='ship';level=i;volume=.5;drops.length=0;displacement.fill(0);speed.fill(0);let cfg=configs[i];ship={x:tank.x+tank.w*.5,y:tank.y+tank.h*.49,w:Math.min(cfg[1],tank.w*.6),vy:0,angle:0,damage:0,fill:0,holes:[]};$('menu').classList.remove('show');$('win').classList.remove('show');updateLabel();$('gameBtn').textContent='🚢 미니게임'}
-function startFree(){mode='free';ship=null;volume=.5;$('win').classList.remove('show');$('menu').classList.remove('show');updateLabel()}
-configs.forEach((cfg,i)=>{let b=document.createElement('button');b.className='btn';b.textContent=(i+1)+'. '+cfg[0];b.onclick=()=>startLevel(i);$('levelList').append(b)});
-$('gameBtn').onclick=()=>{$('menu').classList.add('show')};$('backBtn').onclick=startFree;$('exitBtn').onclick=startFree;$('nextBtn').onclick=()=>startLevel((level+1)%configs.length);
-function sample(x){const p=clamp((x-tank.x)/tank.w*(N-1),0,N-1),i=Math.floor(p);return displacement[i]*(1-(p-i))+displacement[Math.min(i+1,N-1)]*(p-i)}
-function pushAt(x,p){const k=Math.floor(clamp((x-tank.x)/tank.w,0,1)*(N-1));for(let d=-4;d<=4;d++){let j=k+d;if(j>=0&&j<N)speed[j]+=p*Math.exp(-d*d/7)}}
-canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,px:e.clientX,py:e.clientY,t:performance.now()};canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.px,dy=e.clientY-drag.py;drag.px=e.clientX;drag.py=e.clientY;targetX=clamp(targetX+dx/150,-1,1);targetY=clamp(targetY+dy/230,-1,1);manualUntil=performance.now()+1700;pushAt(e.clientX,-dx*.36);if(Math.abs(dx)+Math.abs(dy)>12&&Math.random()<.55)emit(e.clientX,e.clientY,3,.7)});
-canvas.addEventListener('pointerup',e=>{if(!drag)return;const moved=Math.hypot(e.clientX-drag.x,e.clientY-drag.y);if(mode==='ship'&&ship&&moved<28&&Math.abs(e.clientX-ship.x)<ship.w*.58&&Math.abs(e.clientY-ship.y)<ship.w*.7){ship.damage++;ship.fill+=.075;ship.holes.push({x:e.clientX-ship.x,y:e.clientY-ship.y});ship.vy+=1;pushAt(ship.x,8);emit(e.clientX,e.clientY,12,1.4)}else if(moved<25){pushAt(e.clientX,10);emit(e.clientX,e.clientY,10,1)}else if(moved>85)splash(.85);drag=null});
-function clipped(poly,nx,ny,h){let out=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],da=a.x*nx+a.y*ny-h,db=b.x*nx+b.y*ny-h;if(da>=0)out.push(a);if((da>=0)!==(db>=0)){const f=da/(da-db);out.push({x:lerp(a.x,b.x,f),y:lerp(a.y,b.y,f)})}}return out}
-function area(poly){let a=0;for(let i=0;i<poly.length;i++){const b=poly[(i+1)%poly.length];a+=poly[i].x*b.y-b.x*poly[i].y}return Math.abs(a/2)}
-function polygon(){
- let gx=angX,gy=angY,m=Math.hypot(gx,gy);if(m<.12){gx=0;gy=1}else{gx/=m;gy/=m}
- let corners=[{x:tank.x,y:tank.y},{x:tank.x+tank.w,y:tank.y},{x:tank.x+tank.w,y:tank.y+tank.h},{x:tank.x,y:tank.y+tank.h}],d=corners.map(p=>p.x*gx+p.y*gy),lo=Math.min(...d)-2,hi=Math.max(...d)+2;
- for(let i=0;i<14;i++){let middle=(lo+hi)/2;if(area(clipped(corners,gx,gy,middle))/(tank.w*tank.h)>volume)lo=middle;else hi=middle}
- return clipped(corners,gx,gy,(lo+hi)/2)
+function cutPoly(poly,nx,ny,threshold){
+ var out=[];if(!poly.length)return out;
+ for(var i=0;i<poly.length;i++){
+  var a=poly[i],b=poly[(i+1)%poly.length],da=a.x*nx+a.y*ny-threshold,db=b.x*nx+b.y*ny-threshold;
+  if(da>=0)out.push(a);
+  if((da>=0)!==(db>=0)){var t=da/(da-db);out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t})}
+ }return out
 }
-function update(){
- frame++;
- if(performance.now()>manualUntil&&orientationCount===0&&motionCount===0){targetX=lerp(targetX,0,.035);targetY=lerp(targetY,1,.035)}
- angX=lerp(angX,targetX,.77);angY=lerp(angY,targetY,.77);
- const old=displacement.slice();for(let i=0;i<N;i++){let left=old[Math.max(i-1,0)],right=old[Math.min(i+1,N-1)];speed[i]=(speed[i]-old[i]*.023+(left+right-2*old[i])*.24)*.982;displacement[i]=clamp(old[i]+speed[i],-40,40)}
- if(mode==='free'&&volume>.001&&angY<-.32&&frame%3===0){let amt=Math.min(volume,.0032*Math.abs(angY));volume-=amt;for(let i=0;i<Math.min(13,Math.ceil(amt*2700));i++)particle(tank.x+rnd(5,tank.w-5),tank.y+5,rnd(-4,4)+angX*4,-rnd(2,8),rnd(2,5));updateLabel()}
- let gx=angX,gy=angY,m=Math.max(.5,Math.hypot(gx,gy));for(let i=drops.length-1;i>=0;i--){let d=drops[i];d.vx+=gx/m*.14;d.vy+=gy/m*.14;d.vx*=.992;d.vy*=.992;d.x+=d.vx;d.y+=d.vy;d.life--;if(d.x<tank.x||d.x>tank.x+tank.w||d.y>tank.y+tank.h){d.vx*=-.4;d.vy*=-.4}if(d.life<0||d.y<-60||d.y>H+60||d.x<-60||d.x>W+60)drops.splice(i,1)}
- if(mode==='ship'&&ship){const s=ship,cfg=configs[level],base=tank.y+tank.h*.5+sample(s.x),targetY=base-s.w*.08+s.fill*s.w*.65;s.vy=(s.vy+(targetY-s.y)*.025)*.91;s.y+=s.vy;const delta=sample(s.x+s.w*.3)-sample(s.x-s.w*.3);s.angle=lerp(s.angle,clamp(delta/s.w+angX*.30,-1.25,1.25),.08);s.fill+=s.damage*.00015+Math.max(0,Math.abs(s.angle)-.65)*.0008;if(s.damage>=cfg[2])s.fill+=.005;if(s.fill>=1||s.y>tank.y+tank.h-20){ship=null;$('winText').textContent=cfg[0]+' 격침 성공!';$('win').classList.add('show')}}}
-function shipDraw(){if(!ship)return;const s=ship,w=s.w,h=w*.28;c.save();c.translate(s.x,s.y);c.rotate(s.angle);c.fillStyle='#12283b';c.beginPath();c.moveTo(-w*.55,-h*.15);c.lineTo(w*.55,-h*.15);c.lineTo(w*.38,h*.55);c.lineTo(-w*.42,h*.55);c.closePath();c.fill();c.strokeStyle='#b0d7e5';c.lineWidth=2;c.stroke();c.fillStyle='#d9edf1';c.fillRect(-w*.22,-h*.80,w*.47,h*.61);c.fillStyle='#74bada';for(let i=0;i<3;i++)c.fillRect(-w*.18+i*w*.13,-h*.66,w*.085,h*.12);c.fillStyle='#e18069';c.fillRect(-w*.42,-h*.2,w*.84,4);for(const p of s.holes){c.fillStyle='#010b12';c.beginPath();c.arc(p.x,clamp(p.y,-h*.15,h*.45),3.8,0,Math.PI*2);c.fill()}c.restore()}
+function polygonArea(p){var a=0;for(var i=0;i<p.length;i++){var j=(i+1)%p.length;a+=p[i].x*p[j].y-p[j].x*p[i].y}return Math.abs(a)*.5}
+function waterPolygon(){
+ var gx=gravityX,gy=gravityY,L=Math.hypot(gx,gy);if(L<.1){gx=0;gy=1}else{gx/=L;gy/=L}
+ var corners=[{x:tank.x,y:tank.y},{x:tank.x+tank.w,y:tank.y},{x:tank.x+tank.w,y:tank.y+tank.h},{x:tank.x,y:tank.y+tank.h}];
+ var projection=corners.map(function(p){return p.x*gx+p.y*gy}),lo=Math.min.apply(null,projection)-1,hi=Math.max.apply(null,projection)+1;
+ for(var i=0;i<17;i++){var mid=(lo+hi)/2,p=cutPoly(corners,gx,gy,mid);if(polygonArea(p)/(tank.w*tank.h)>waterAmount)lo=mid;else hi=mid}
+ return cutPoly(corners,gx,gy,(lo+hi)/2)
+}
+
 function draw(){
- const back=c.createLinearGradient(0,0,W,H);back.addColorStop(0,'#061421');back.addColorStop(.6,'#0a2137');back.addColorStop(1,'#061220');c.fillStyle=back;c.fillRect(0,0,W,H);
- c.fillStyle='#a5d7ff08';for(let i=0;i<28;i++)c.fillRect(i*W/27,0,1,H);
- c.fillStyle='#0c283b';c.fillRect(tank.x-4,tank.y,tank.w+8,tank.h+5);
- c.fillStyle='#092033';c.fillRect(tank.x,tank.y,tank.w,tank.h);
- const poly=polygon();c.save();c.beginPath();c.rect(tank.x,tank.y,tank.w,tank.h);c.clip();
- if(poly.length){c.beginPath();c.moveTo(poly[0].x,poly[0].y);for(let i=1;i<poly.length;i++)c.lineTo(poly[i].x,poly[i].y);c.closePath();const fill=c.createLinearGradient(tank.x,tank.y,tank.x+tank.w*.3,tank.y+tank.h);fill.addColorStop(0,'#66ebf5');fill.addColorStop(.36,'#12a7d5');fill.addColorStop(1,'#04528c');c.fillStyle=fill;c.fill();c.strokeStyle='#b1ffff';c.lineWidth=2.5;c.stroke();
- // Soft internal light bands, no image textures.
- c.save();c.clip();for(let i=0;i<9;i++){const y=tank.y+i*tank.h/8+Math.sin(frame*.024+i)*7;c.beginPath();c.moveTo(tank.x-10,y);c.bezierCurveTo(tank.x+tank.w*.35,y-9,tank.x+tank.w*.7,y+9,tank.x+tank.w+10,y-4);c.strokeStyle='rgba(191,247,255,.075)';c.lineWidth=5;c.stroke()}c.restore()}
- if(mode==='ship')shipDraw();
- c.restore();
- for(let i=0;i<drops.length;i++){let d=drops[i];c.globalAlpha=clamp(d.life/100,.1,.9);c.fillStyle='#72dfff';c.beginPath();c.arc(d.x,d.y,d.r,0,7);c.fill()}c.globalAlpha=1;
- c.lineWidth=3;c.strokeStyle='#75cfe276';c.beginPath();c.moveTo(tank.x,tank.y);c.lineTo(tank.x,tank.y+tank.h);c.lineTo(tank.x+tank.w,tank.y+tank.h);c.lineTo(tank.x+tank.w,tank.y);c.stroke();
- c.fillStyle='#d9faff95';c.textAlign='center';c.font='12px system-ui';c.fillText(mode==='free'?'물 50%로 시작 · 기울이기 / 흔들기 / 터치':'배를 눌러 구멍을 내고 흔들어 침몰시키세요',W/2,Math.min(H-80,tank.y+tank.h+27));
+ ctx.fillStyle='#061827';ctx.fillRect(0,0,W,H);
+ var bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#10354b');bg.addColorStop(1,'#030d19');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+ for(var star=0;star<32;star++){ctx.fillStyle='rgba(180,237,255,.06)';ctx.fillRect((star*119.7)%W,(star*91.2)%H,2,2)}
+ ctx.fillStyle='#102b3b';ctx.fillRect(tank.x-5,tank.y-4,tank.w+10,tank.h+11);
+ ctx.fillStyle='#062037';ctx.fillRect(tank.x,tank.y,tank.w,tank.h);
+ ctx.save();ctx.beginPath();ctx.rect(tank.x,tank.y,tank.w,tank.h);ctx.clip();
+ var poly=waterPolygon(),gradient=ctx.createLinearGradient(0,tank.y,0,tank.y+tank.h);gradient.addColorStop(0,'rgba(49,216,249,.80)');gradient.addColorStop(.48,'rgba(4,147,222,.85)');gradient.addColorStop(1,'rgba(0,68,154,.96)');
+ if(poly.length){
+  ctx.beginPath();ctx.moveTo(poly[0].x,poly[0].y);for(var p=1;p<poly.length;p++)ctx.lineTo(poly[p].x,poly[p].y);ctx.closePath();ctx.fillStyle=gradient;ctx.fill();
+  ctx.strokeStyle='#b3f5ff';ctx.lineWidth=2.5;ctx.stroke();
+ }
+ // Dynamic shimmer and overlapping waves on top of the particle spray.
+ ctx.strokeStyle='rgba(191,250,255,.13)';ctx.lineWidth=1.2;
+ if(gravityY>.3&&waterAmount>.02){
+   for(var q=0;q<3;q++){ctx.beginPath();for(var j=0;j<segments;j++){var xx=tank.x+j*tank.w/(segments-1),yy=surfaceAt(xx)+(q+1)*15+Math.sin(j*.21+frame*.068+q)*3;if(j===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy)}ctx.stroke()}
+ }
+ drawShip();
+ for(var i=0;i<particles.length;i++){var a=particles[i];ctx.globalAlpha=clamp(a.life/a.max,.1,.95);ctx.beginPath();ctx.arc(a.x,a.y,a.r,0,6.283);ctx.fillStyle=a.under?'rgba(204,249,255,.24)':'#b8f5ff';a.under?ctx.stroke():ctx.fill()}
+ ctx.globalAlpha=1;
+ for(var d=0;d<debris.length;d++){ctx.fillStyle='#d78f53';ctx.fillRect(debris[d].x,debris[d].y,3,3)}
+ ctx.restore();
+ // Free individual droplets, drawn outside the tank clip so spills can escape.
+ for(var z=0;z<spillDrops.length;z++){var drop=spillDrops[z];ctx.fillStyle='rgba(64,207,251,.80)';ctx.beginPath();ctx.arc(drop.x,drop.y,drop.r,0,6.283);ctx.fill();ctx.fillStyle='rgba(225,255,255,.58)';ctx.beginPath();ctx.arc(drop.x-drop.r*.25,drop.y-drop.r*.3,Math.max(.6,drop.r*.27),0,6.283);ctx.fill()}
+ ctx.strokeStyle='#82e8f077';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(tank.x,tank.y);ctx.lineTo(tank.x,tank.y+tank.h);ctx.lineTo(tank.x+tank.w,tank.y+tank.h);ctx.lineTo(tank.x+tank.w,tank.y);ctx.stroke();
+ ctx.textAlign='center';ctx.fillStyle='#b8e8ff99';ctx.font='12px system-ui';ctx.fillText(freeMode?'열린 수조 · 뒤집으면 물이 밖으로 쏟아집니다':'배를 터치해 구멍을 내고 파도를 일으키세요',W/2,tank.y+tank.h+25);
+ requestAnimationFrame(loop)
 }
-function loop(){update();draw();requestAnimationFrame(loop)}
-resize();updateLabel();if(!('DeviceOrientationEvent'in window)&&!('DeviceMotionEvent'in window))status('센서 미지원 · 터치로 플레이','off');requestAnimationFrame(loop);
+function loop(){physics();draw()}
+window.addEventListener('resize',resize);resize();startFree();requestAnimationFrame(loop);
+if(!('DeviceOrientationEvent'in window)&&!('DeviceMotionEvent'in window))sensorText('⚪ 자이로 미지원 · 터치/버튼으로 플레이');else sensorText('🟡 자이로 대기 · 센서 켜기 누르세요');
 })();
 </script></body></html>
