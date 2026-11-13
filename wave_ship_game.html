@@ -44,7 +44,7 @@ canvas.addEventListener('pointerdown',function(e){dragStart={x:e.clientX,y:e.cli
 canvas.addEventListener('pointermove',function(e){if(!dragStart)return;var dx=e.clientX-mouseX;mouseX=e.clientX;mouseY=e.clientY;if(Math.abs(dx)>1){tilt=clamp(tilt+dx/90,-1,1);gravityX=tilt;disturb(e.clientX,clamp(dx*.36,-6,6))}});
 canvas.addEventListener('pointerup',function(e){if(!dragStart)return;if(Math.hypot(e.clientX-dragStart.x,e.clientY-dragStart.y)<25)impact(e.clientX,e.clientY);else if(Math.abs(e.clientX-dragStart.x)>90)bigWave();dragStart=null});
 function drawShip(){var s=ship;if(!s||freeMode)return;ctx.save();ctx.translate(s.x,s.y);ctx.rotate(s.angle);var w=s.w,h=w*.29;ctx.fillStyle='#192e43';ctx.beginPath();ctx.moveTo(-w*.53,-h*.25);ctx.lineTo(w*.51,-h*.25);ctx.lineTo(w*.36,h*.55);ctx.lineTo(-w*.34,h*.55);ctx.closePath();ctx.fill();ctx.strokeStyle='#8ac5df';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#df6e4b';ctx.fillRect(-w*.42,-h*.26,w*.84,h*.12);ctx.fillStyle='#e5f3f4';ctx.fillRect(-w*.24,-h*.75,w*.42,h*.47);ctx.fillStyle='#4c99c5';for(var i=0;i<3;i++)ctx.fillRect(-w*.18+i*w*.12,-h*.65,w*.075,h*.13);ctx.fillStyle='#f8dc8b';ctx.fillRect(w*.14,-h*.94,w*.06,h*.20);ctx.fillStyle='#22333a';ctx.fillRect(-w*.4,h*.12,w*.8,Math.max(1,h*.05));for(var j=0;j<s.holes.length;j++){var p=s.holes[j];ctx.fillStyle='#050c16';ctx.beginPath();ctx.arc(p.dx,clamp(p.dy,-h*.1,h*.45),4,0,Math.PI*2);ctx.fill()}if(s.fill>0){ctx.fillStyle='rgba(31,174,230,.55)';ctx.fillRect(-w*.35,h*(.46-s.fill*.8),w*.70,Math.min(h*.8,s.fill*h*.75))}ctx.restore()}
-function physics(){frame++;var sensorActive=orientationCount&&performance.now()-lastOrientation<2200;if(sensorActive){tilt+=(sensorTilt-tilt)*.48}else if(!dragStart){tilt*=.985;gravityX*=.985;gravityY+=(1-gravityY)*.022}tilt=clamp(tilt,-1,1);var old=surface.slice();for(var i=0;i<segments;i++){var left=old[Math.max(0,i-1)],right=old[Math.min(segments-1,i+1)];var force=-old[i]*.024+(left+right-2*old[i])*.20;velocity[i]=(velocity[i]+force)*.982;surface[i]=clamp(old[i]+velocity[i],-tank.h*.23,tank.h*.23)}if(level===7&&frame%90===0)bigWave();
+function physics(){frame++;var sensorActive=orientationCount&&performance.now()-lastOrientation<2200;if(sensorActive){tilt+=(sensorTilt-tilt)*.48}else if(!dragStart){tilt*=.985;gravityX*=.985;gravityY+=(1-gravityY)*.022}tilt=clamp(tilt,-1,1);if(frame%3===0){var impulse=(tilt-prevGravityX)*22;velocity[3]+=impulse;velocity[segments-4]-=impulse;prevGravityX=tilt}var old=surface.slice();for(var i=0;i<segments;i++){var left=old[Math.max(0,i-1)],right=old[Math.min(segments-1,i+1)];var force=-old[i]*.024+(left+right-2*old[i])*.20;velocity[i]=(velocity[i]+force)*.982;surface[i]=clamp(old[i]+velocity[i],-tank.h*.23,tank.h*.23)}if(level===7&&frame%90===0)bigWave();
 var s=ship,c=levels[level];if(!freeMode&&s&&!win){var sea=surfaceAt(s.x),a=surfaceAt(s.x-s.w*.30),b=surfaceAt(s.x+s.w*.30),slope=Math.atan2(b-a,s.w*.6);var desired=sea-s.w*.095+s.fill*s.w*.88;var gravity=(desired-s.y)*.028;s.vy=(s.vy+gravity)*.91;s.y+=s.vy;s.angV+=(slope-s.angle)*.022; s.angV+=(tilt*.17-s.angle)*.006;s.angV*=.92;s.angle=clamp(s.angle+s.angV,-1.48,1.48);s.vx+=(tilt*.11+Math.sin(frame*.01)*.012);s.vx*=.984;s.x=clamp(s.x+s.vx,tank.x+s.w*.46,tank.x+tank.w-s.w*.46);if(s.damage)s.fill+=.00035+s.damage*c.leak*.00012;if(Math.abs(s.angle)>.68)s.fill+=.0017;if(s.y>sea+s.w*.15)s.fill+=.0015;if(s.fill>.27&&frame%5===0)bubble(s.x+rnd(-s.w*.28,s.w*.28),s.y+12);if(frame%28===0&&Math.abs(s.vy)>1)splash(s.x,sea,.4,3);if(s.fill>=1||s.y>tank.y+tank.h-18){win=true;s.sunk=true;setTimeout(function(){el('resultTitle').textContent='🚢 침몰 성공!';el('resultText').textContent=(level+1)+'레벨 '+c.name+' 격침 완료! 다음 배는 더 튼튼하고 어렵습니다.';el('continue').textContent=level===7?'처음부터 다시':'다음 레벨 시작';el('next').style.display='block';el('overlay').classList.add('show')},850)}}updateSpill();for(var p=particles.length-1;p>=0;p--){var q=particles[p];q.x+=q.vx;q.y+=q.vy;q.life--;if(q.under){q.vx*=.98;if(q.y<=surfaceAt(q.x)){disturb(q.x,-.8);particles.splice(p,1);continue}}else{q.vy+=.17;q.vx*=.99;if(q.y>surfaceAt(q.x)&&q.vy>0){bubble(q.x,q.y);particles.splice(p,1);continue}}if(q.life<=0)particles.splice(p,1)}for(var z=debris.length-1;z>=0;z--){var d=debris[z];d.x+=d.vx;d.y+=d.vy;d.vy+=.12;d.life--;if(d.life<=0)debris.splice(z,1)}}
 
 function addDrop(x,y,vx,vy,r){spillDrops.push({x:x,y:y,vx:vx,vy:vy,r:r||rnd(2,5),life:380});if(spillDrops.length>420)spillDrops.splice(0,spillDrops.length-420)}
@@ -103,8 +103,28 @@ function draw(){
  ctx.save();ctx.beginPath();ctx.rect(tank.x,tank.y,tank.w,tank.h);ctx.clip();
  var poly=waterPolygon(),gradient=ctx.createLinearGradient(0,tank.y,0,tank.y+tank.h);gradient.addColorStop(0,'rgba(49,216,249,.80)');gradient.addColorStop(.48,'rgba(4,147,222,.85)');gradient.addColorStop(1,'rgba(0,68,154,.96)');
  if(poly.length){
-  ctx.beginPath();ctx.moveTo(poly[0].x,poly[0].y);for(var p=1;p<poly.length;p++)ctx.lineTo(poly[p].x,poly[p].y);ctx.closePath();ctx.fillStyle=gradient;ctx.fill();
-  ctx.strokeStyle='#b3f5ff';ctx.lineWidth=2.5;ctx.stroke();
+  // Draw the actual liquid boundary as a moving wave, not a flat polygon edge.
+  // Keep the gravity polygon for sideways / upside-down orientation.
+  var upright=gravityY>0.28 && Math.abs(gravityX)<0.90;
+  if(upright){
+   var baseY=tank.y+tank.h*(1-waterAmount),lean=gravityX/Math.max(.35,gravityY);
+   function waveY(x){
+    var k=(x-tank.x)/tank.w,idx=Math.max(0,Math.min(segments-1,Math.round(k*(segments-1))));
+    var oscillation=Math.sin(k*11.5-frame*.047)*3.4+Math.sin(k*23+frame*.075)*1.6;
+    return Math.max(tank.y-22,Math.min(tank.y+tank.h+22,baseY-lean*(x-(tank.x+tank.w*.5))*.48+surface[idx]*1.45+oscillation));
+   }
+   ctx.beginPath();ctx.moveTo(tank.x,tank.y+tank.h);ctx.lineTo(tank.x,waveY(tank.x));
+   for(var p=1;p<segments;p++){var xx=tank.x+tank.w*p/(segments-1);ctx.lineTo(xx,waveY(xx))}
+   ctx.lineTo(tank.x+tank.w,tank.y+tank.h);ctx.closePath();ctx.fillStyle=gradient;ctx.fill();
+   ctx.beginPath();ctx.moveTo(tank.x,waveY(tank.x));
+   for(var p=1;p<segments;p++){var xx=tank.x+tank.w*p/(segments-1);ctx.lineTo(xx,waveY(xx))}
+   ctx.strokeStyle='#b3f5ff';ctx.lineWidth=3;ctx.stroke();
+  }else{
+   ctx.beginPath();ctx.moveTo(poly[0].x,poly[0].y);
+   for(var p=1;p<poly.length;p++)ctx.lineTo(poly[p].x,poly[p].y);
+   ctx.closePath();ctx.fillStyle=gradient;ctx.fill();
+   ctx.strokeStyle='#b3f5ff';ctx.lineWidth=2.5;ctx.stroke();
+  }
  }
  // Dynamic shimmer and overlapping waves on top of the particle spray.
  ctx.strokeStyle='rgba(191,250,255,.13)';ctx.lineWidth=1.2;
