@@ -1,0 +1,18 @@
+{
+  "name": "WAVE TANK — 물리 물놀이",
+  "short_name": "WAVE TANK",
+  "start_url": "./wave_ship_game.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#061827",
+  "theme_color": "#061627",
+  "description": "휴대폰 자이로로 물을 움직이는 게임",
+  "icons": [
+    {
+      "src": "./wave-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
