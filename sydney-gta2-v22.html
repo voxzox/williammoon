@@ -251,7 +251,7 @@
     <!-- 모바일 컨트롤 위치 편집 오버레이 -->
     <div id="mobileLayoutEditor" class="absolute inset-0 z-40 hidden flex-col justify-between pointer-events-none bg-slate-950/15">
         <div class="m-3 p-3 rounded-xl bg-slate-950/90 border border-amber-400/50 text-white text-xs pointer-events-auto shadow-xl">
-            <div class="font-black text-amber-300 mb-1">컨트롤 위치 편집</div>
+            <div class="font-black text-amber-300 mb-1">컨트롤 위치 편집 · 게임 일시정지</div>
             <div class="text-slate-300">노란 점선이 있는 조작기를 끌어서 원하는 위치에 놓으세요. 화면 비율이 달라도 저장한 비율 위치를 유지합니다.</div>
         </div>
         <div class="m-3 flex gap-2 justify-center pointer-events-auto">
@@ -1511,6 +1511,7 @@
         let mobileLayout = loadMobileLayout();
         let mobileControlsInitialized = false;
         let mobileLayoutEditing = false;
+        let mobileLayoutPausedGame = false;
 
         function isMobileDevice() {
             return window.matchMedia('(pointer: coarse)').matches ||
@@ -1731,19 +1732,47 @@
             if (!isMobileDevice()) return;
             initMobileControls();
             mobileLayoutEditing = true;
+            mobileLayoutPausedGame = !STATE.menu && !STATE.gameOver;
             document.body.classList.add('layout-editing');
             mobileLayoutEditor.classList.remove('hidden');
+            mobileLayoutEditor.classList.add('flex');
             document.getElementById('mobileControls').classList.remove('hidden');
             mobileWeaponRail.classList.remove('hidden');
             mobileSkyBtn.classList.remove('hidden');
+            mobileGodBtn.classList.remove('hidden');
+
+            const saveBtn = document.getElementById('saveMobileLayoutBtn');
+            const resetBtn = document.getElementById('resetMobileLayoutBtn');
+            if (saveBtn) {
+                saveBtn.classList.remove('hidden');
+                saveBtn.style.display = '';
+                saveBtn.disabled = false;
+            }
+            if (resetBtn) {
+                resetBtn.classList.remove('hidden');
+                resetBtn.style.display = '';
+                resetBtn.disabled = false;
+            }
+
+            input.moveDir.x = 0;
+            input.moveDir.y = 0;
+            input.isShootingMobile = false;
+            input.keys = {};
             applySavedMobileLayout();
+            drawGame();
         }
 
         function exitMobileLayoutEditor(save = true) {
             if (save) saveMobileLayout();
             mobileLayoutEditing = false;
+            mobileLayoutPausedGame = false;
             document.body.classList.remove('layout-editing');
             mobileLayoutEditor.classList.add('hidden');
+            mobileLayoutEditor.classList.remove('flex');
+            input.moveDir.x = 0;
+            input.moveDir.y = 0;
+            input.isShootingMobile = false;
+            input.keys = {};
             applySavedMobileLayout();
         }
 
@@ -1761,17 +1790,21 @@
 
         document.getElementById('mobileLayoutBtn').addEventListener('click', () => enterMobileLayoutEditor());
         document.getElementById('saveMobileLayoutBtn').addEventListener('click', () => {
+            const wasMenu = STATE.menu;
             exitMobileLayoutEditor(true);
-            if (STATE.menu) {
+            if (wasMenu) {
                 try { AudioEngine.init(); } catch (_) {}
                 startNewSession();
                 ensureGameLoopStarted();
-                drawGame();
             }
+            drawGame();
+            showToast('모바일 컨트롤 위치 저장 완료');
         });
         document.getElementById('resetMobileLayoutBtn').addEventListener('click', () => {
             mobileLayout = JSON.parse(JSON.stringify(defaultMobileLayout));
+            saveMobileLayout();
             applySavedMobileLayout();
+            drawGame();
         });
 
         function toggleTransportation() {
@@ -5130,7 +5163,9 @@
         let gameLoopStarted = false;
 
         function gameLoop() {
-            updateGame();
+            if (!mobileLayoutEditing) {
+                updateGame();
+            }
             drawGame();
             requestAnimationFrame(gameLoop);
         }
@@ -5178,6 +5213,6 @@
             ensureGameLoopStarted();
         }, { once: true });
     </script>
-    <!-- deploy: 2026-11-14-mobile-god -->
+    <!-- deploy: 2026-11-14-layout-pause-reset -->
 </body>
 </html>
