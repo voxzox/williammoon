@@ -41,6 +41,7 @@
         body.mobile-ui .mobile-action-btn { width: 3.05rem; height: 3.05rem; font-size: 0.58rem; }
         body.mobile-ui #mobileWeaponRail { display: flex; }
         body.mobile-ui #mobileSkyBtn { display: flex; }
+        body.mobile-ui #mobileGodBtn { display: flex; }
         body.mobile-ui #mobileInteractBtn { display: none; }
         body.mobile-ui #mobileInteractBtn.context-visible { display: flex; }
         body.mobile-ui #mobileHijackBtn.context-visible { display: flex; }
@@ -51,6 +52,7 @@
         body.mobile-ui.layout-editing #joystickMoveZone,
         body.mobile-ui.layout-editing #joystickShootZone,
         body.mobile-ui.layout-editing #mobileSkyBtn,
+        body.mobile-ui.layout-editing #mobileGodBtn,
         body.mobile-ui.layout-editing #mobileWeaponRail { outline: 2px dashed rgba(250,204,21,.95); outline-offset: 3px; }
         body.mobile-ui.layout-editing .layout-draggable { touch-action: none; cursor: move; }
         .mobile-weapon-slot { width: 2.35rem; height: 2.35rem; font-size: 0.62rem; }
@@ -231,6 +233,10 @@
         <!-- 평소에는 공중 사격만 고정 표시 -->
         <button id="mobileSkyBtn" data-layout-key="sky" class="layout-draggable absolute hidden mobile-action-btn rounded-full bg-violet-500/90 border border-violet-200 text-white font-black shadow-lg active:scale-95 flex-col items-center justify-center pointer-events-auto">
             <i class="fa-solid fa-crosshairs text-base"></i><span>공중</span>
+        </button>
+
+        <button id="mobileGodBtn" data-layout-key="god" class="layout-draggable absolute hidden mobile-action-btn rounded-full bg-emerald-500/90 border border-emerald-200 text-slate-950 font-black shadow-lg active:scale-95 flex-col items-center justify-center pointer-events-auto">
+            <span class="text-base">∞</span><span>무한</span>
         </button>
 
         <!-- 상황에 따라 나타나는 버튼 -->
@@ -1490,6 +1496,7 @@
         const joystickShootStick = document.getElementById('joystickShootStick');
         const mobileWeaponRail = document.getElementById('mobileWeaponRail');
         const mobileSkyBtn = document.getElementById('mobileSkyBtn');
+        const mobileGodBtn = document.getElementById('mobileGodBtn');
         const mobileInteractBtn = document.getElementById('mobileInteractBtn');
         const mobileHijackBtn = document.getElementById('mobileHijackBtn');
         const mobileLayoutEditor = document.getElementById('mobileLayoutEditor');
@@ -1498,7 +1505,8 @@
             move: { x: 16, y: 78 },
             shoot: { x: 78, y: 78 },
             weapons: { x: 2.5, y: 29 },
-            sky: { x: 85, y: 58 }
+            sky: { x: 85, y: 58 },
+            god: { x: 92, y: 42 }
         };
         let mobileLayout = loadMobileLayout();
         let mobileControlsInitialized = false;
@@ -1537,6 +1545,7 @@
             setLayoutPosition(joystickShootZone, mobileLayout.shoot);
             setLayoutPosition(mobileWeaponRail, mobileLayout.weapons);
             setLayoutPosition(mobileSkyBtn, mobileLayout.sky);
+            setLayoutPosition(mobileGodBtn, mobileLayout.god);
         }
 
         function applyMobileLayout() {
@@ -1563,6 +1572,7 @@
             document.getElementById('mobileControls').classList.remove('hidden');
             mobileWeaponRail.classList.remove('hidden');
             mobileSkyBtn.classList.remove('hidden');
+            mobileGodBtn.classList.remove('hidden');
             applySavedMobileLayout();
             updateMobileWeaponRail();
             if (mobileControlsInitialized) return;
@@ -1663,6 +1673,9 @@
             mobileSkyBtn.addEventListener('click', () => {
                 if (!mobileLayoutEditing) fireSkyWeapon();
             });
+            mobileGodBtn.addEventListener('click', () => {
+                if (!mobileLayoutEditing) toggleGodMode();
+            });
             mobileInteractBtn.addEventListener('click', () => interactWithWorld());
             mobileHijackBtn.addEventListener('click', () => toggleTransportation());
 
@@ -1670,6 +1683,7 @@
             setupLayoutDrag(joystickShootZone, 'shoot');
             setupLayoutDrag(mobileWeaponRail, 'weapons');
             setupLayoutDrag(mobileSkyBtn, 'sky');
+            setupLayoutDrag(mobileGodBtn, 'god');
         }
 
         function setupLayoutDrag(el, key) {
@@ -4971,6 +4985,14 @@
                 godBtn.className = STATE.godMode
                     ? 'w-full px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-400 text-emerald-300 text-xs font-black tracking-wider shadow-lg transition-colors'
                     : 'w-full px-3 py-2 rounded-xl bg-slate-950/95 border border-slate-700 text-slate-400 text-xs font-black tracking-wider shadow-lg hover:border-emerald-500 hover:text-emerald-400 transition-colors';
+            }
+            const mobileGodBtn = document.getElementById('mobileGodBtn');
+            if (mobileGodBtn) {
+                mobileGodBtn.innerHTML = STATE.godMode
+                    ? '<span class="text-base">∞</span><span>무한 ON</span>'
+                    : '<span class="text-base">∞</span><span>무한</span>';
+                mobileGodBtn.classList.toggle('ring-4', STATE.godMode);
+                mobileGodBtn.classList.toggle('ring-emerald-200', STATE.godMode);
             }
             document.getElementById('staminaBar').style.width = `${player.stamina}%`;
             document.getElementById('scoreValue').innerText = String(STATE.score).padStart(6, '0');
